@@ -175,8 +175,8 @@ export function present(ui: UI, content: () => UINode, options: PresentOptions =
       animate(node, "translateY", 0, { dur: 160, easing: "out" });
     }
   }
-  // focus lands in the panel on a surface driven by buttons
-  if (ui.idioms().focus && ui.input.focusVisible()) {
+  // focus lands in the panel when a button opened it, or the focus was showing
+  if (ui.idioms().focus && (ui.input.focusVisible() || ui.input.byPad())) {
     const land = () => {
       ui.root.afterLayout.delete(land);
       if (open) ui.input.move("down");

@@ -60,6 +60,8 @@ export interface UIInput {
   focus(instance: Instance | null, show?: boolean): void;
   /** whether the focus ring shows: a button was the last input */
   focusVisible(): boolean;
+  /** whether the last input was a button of the pad, shown focus or not (a menu opened by a button takes the focus) */
+  byPad(): boolean;
   /** handlers run newest first after the d-pad and confirm; one that returns true ends the press */
   onButton(handler: ButtonHandler): () => void;
   /** called at a long press; returning a drag makes the rest of the contact a transfer */
@@ -215,7 +217,9 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
   // --- buttons ---------------------------------------------------------------
   let held = 0;
   let heldFor = 0;
+  let pad = false;
   const press = (button: number, repeat: boolean) => {
+    pad = true;
     for (const [mask, direction] of DPAD) {
       if (button & mask) {
         if (move(direction)) return;
@@ -280,6 +284,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
       surface: options.surface,
       axis: "any",
       onDown(c: GestureContact) {
+        pad = false;
         if (visible) setFocus(focused, false);
         const path = root.hit(c.x, c.y);
         // a contact that lands on a moving list stops it and is not a press
@@ -425,6 +430,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
     focused: () => focused,
     focus: (instance, show = visible) => setFocus(instance, show),
     focusVisible: () => visible,
+    byPad: () => pad,
     onButton(handler) {
       handlers.push(handler);
       return () => {
