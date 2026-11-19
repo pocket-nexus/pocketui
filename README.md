@@ -160,7 +160,9 @@ What that buys, from one source:
 | --- | --- | --- | --- | --- |
 | The application's frame | none | navy title bar, close box | blue title bar, red close box | title bar with three lights, centred title |
 | Commands | bar controls, the rest in a sheet | a menu bar (one menu per `Command.menu`) and bar buttons | the same | toolbar capsules and "more" |
-| Scroll bar | a thumb over the content | a strip with an arrow at each end | the same, with ridges | a strip with a blue capsule |
+| Scroll bar | a pale thumb over the content while it moves | the same, dark | the same, blue | the same, grey |
+| An inspector over another pane | a panel under the bars with a line and a shadow | a tool window's raised frame, with a close box in its heading | a blue-edged panel, with a red close box | a panel of the window's grey, with a red light in its heading |
+| A pointer at rest | a tint on a row, a bar control or a menu row | the menu row or menu title under it in navy | the same in blue, and an orange ring on a push button | the menu row under it in blue |
 | A task or a menu | a sheet from the bottom edge | a window with a title bar | the same | a window with a heading |
 | Default button | filled, last | a black frame, first | a blue ring, first | a blue gel, last |
 | A task's actions (`present({ actions })`) | the way out beside the heading, the thing to do as one wide button | push buttons at the foot, centred | push buttons at the foot, trailing | push buttons at the foot, trailing, Cancel first |
@@ -176,6 +178,8 @@ The rule this rests on: **what a tradition arranges differently, the application
 Nothing in an application or in the kit asks which theme is active. Two rules keep a change of theme from losing state: what holds state (a scroll view, a field, a pane) is made once and stays where it is in the tree, and only stateless chrome (a title bar, a row of dialog buttons) is made again for a theme that arranges it differently. That is why a `Scroll` is always a row of the view and a strip, and the strip takes no room under a theme whose scroll bar is an overlay.
 
 Writing a theme is filling a table (`defineTheme({ color, face, metric, traits, parts, glyphs })`); `themes/classic.ts` is 190 lines. `bun test test/theme.test.ts` checks every shipped theme: every part in twenty states, colours the core can parse, text that reads on the ground its part paints, marks that fit their boxes.
+
+One thing the engine does for every theme: a rounded box with an edge is painted as two rounded boxes, the edge's colour and the body inside it by the edge's width. The core's own rounded border thins to a hair along the arcs, which left a capsule's rim uneven.
 
 The four themes are original drawings in PocketJS primitives (the core's bevel rings, three-stop gradients, rounded boxes, 1-point strips). They contain no artwork from any operating system.
 
@@ -254,7 +258,8 @@ MIT. `assets/fonts/` is W95FA and the atlases baked from it, under the SIL Open 
 - **A carry starts and ends in panes that are both on screen.** In `stack` a session is named in a message by typing `@`.
 - **No images.** A control is text and shape; PocketJS bakes images from names the compiler sees, and the kit names none. A theme's gel is a gradient under a gloss layer, and its marks are rectangles.
 - **A theme cannot round one corner.** The core's corner radius is one number a box (per-corner radius is reserved in its spec), so a title bar's top corners are square, and a bevel and a radius do not combine.
-- **No hover.** A part's states are pressed, focused, selected, disabled and active; a pointer resting on a control does not light it.
+- **Hover needs a host that says where the pointer rests.** A part's state has `hovered`, and `ui.input.hover(point)` sets it. PocketJS gives an applet touch contacts and no pointer, so a host with a pointer sends its resting position as a contact with the id `HOVER_CONTACT` (15), which is read as hover and never as a touch; Omarchy Pocket's shell does that for an applet that lists `pointer` among its `applet.services`.
+- **A scroll bar is a thumb over the content in every shipped theme.** The strip beside the content (`traits.scroll: "strip"`, `ui/scrollbar.ts`: a track, a draggable thumb, a button at each end) is still there for a theme that wants one; it takes width from the content and wants a pointer, which is why none of the four uses it.
 - **The menu bar is the pointer's.** The pad opens the whole command list with its menu button, in every theme.
 - **A guest bundle needs minifying.** PocketUI with an application the size of Pocket Lody is 680 KiB unminified, over the applet rules' 640 KiB; `POCKETJS_MINIFY=1` makes it 310 KiB.
 - **Focus crosses a feed's mounted rows only.** Past the last mounted row the d-pad scrolls the feed, and the next press finds the rows that mounted.

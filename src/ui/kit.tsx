@@ -13,7 +13,7 @@
 // (a scroll view, a field, a pane) is made once and stays where it is in the
 // tree; only stateless chrome (a title bar, a row of buttons) is made again
 // for a theme that arranges it differently.
-import { createMemo, createRenderEffect, createSignal, For, mergeProps, onCleanup, Show, splitProps, untrack, type JSX } from "solid-js";
+import { createContext, createMemo, createRenderEffect, createSignal, For, mergeProps, onCleanup, Show, splitProps, untrack, useContext, type JSX } from "solid-js";
 import { jump } from "@pocketjs/framework/animation";
 import type { Command } from "../core/commands.ts";
 import { caption } from "./caption.ts";
@@ -229,7 +229,7 @@ export function Picker(props: PickerProps): UIElement {
               <Text role="caption" tone="faint" lines={1}>{props.note}</Text>
             </Show>
             <ZStack part="picker.button" width={ui.metric().control - 2} height={ui.metric().control - 2} disabled={props.disabled}>
-              <Glyph glyph="updown" size={8} anchor="center" />
+              <Glyph glyph="updown" size={10} anchor="center" />
             </ZStack>
           </HStack>
         </HStack>
@@ -292,6 +292,14 @@ export function Progress(props: { value: number } & BoxProps): UIElement {
 // A pane's bar, rows and sections
 // ---------------------------------------------------------------------------
 
+/** What a pane's content can know about the pane it is in. */
+interface PaneInfo {
+  /** it is a panel over another pane, under the bars: its own bar is a heading with a way to close it */
+  panel: () => boolean;
+  close: () => void;
+}
+const PaneContext = createContext<PaneInfo>();
+
 export interface BarProps {
   title: string;
   /** a second line under the title */
@@ -344,8 +352,19 @@ export function Bar(props: BarProps): UIElement {
   // pane with nothing open still carries its stretch of the surface.
   const unified = () => ui.theme.traits.unifiedBars;
   const empty = () => !props.title && !props.leading && !props.trailing && controls().length === 0 && !backShown();
+  // In a panel that lies over another pane, the bar is the panel's heading: its
+  // title, and the control that closes it. The frame's bars are above it.
+  const pane = useContext(PaneContext);
+  const panel = () => pane?.panel() === true;
   return (
-    <VStack hidden={empty() && !unified()}>
+    <VStack hidden={empty() && !unified() && !panel()}>
+      <HStack part="section" variant="panel" hidden={!panel()} spacing={6}>
+        <Text lines={1} grow={1}>{ui.theme.traits.sectionCaps ? props.title.toUpperCase() : props.title}</Text>
+        <ZStack part="caption.button" variant="close" width={ui.metric().captionButton[0]} height={ui.metric().captionButton[1]} focusable={false} onPress={() => pane?.close()} name="panel.close">
+          <Glyph glyph="close" size={Math.min(ui.metric().captionButton[0], ui.metric().captionButton[1]) - 6} anchor="center" state={{ variant: "caption" }} />
+        </ZStack>
+      </HStack>
+      <VStack hidden={panel()}>
       <HStack part="bar" height={unified() ? ui.metric().bar + 10 : undefined} minHeight={ui.metric().bar + (props.subtitle ? 10 : 0)} spacing={6}>
         <Show when={backShown()}>
           <BarControl label={ui.theme.traits.back === "label" ? "Back" : undefined} glyph="back" tone="accent" onPress={() => center.back()} name="bar.back" />
@@ -368,6 +387,7 @@ export function Bar(props: BarProps): UIElement {
         </Show>
       </HStack>
       <VStack height={1} part="divider" hidden={unified()} />
+      </VStack>
     </VStack>
   ) as UIElement;
 }
@@ -697,7 +717,16 @@ export function Panes(props: PanesViewProps): UIElement {
     () => props.depth >= 2 || (props.depth === 1 && ui.idioms().panes === "stack"),
   );
   // made once: the panes hold the application's state
-  const panes = [<ZStack part="pane">{props.list}</ZStack>, <ZStack part="pane.detail">{props.detail}</ZStack>, <ZStack part="sidebar">{props.inspector}</ZStack>];
+  // the inspector lies over the detail where the panes are two columns: a panel under the bars
+  const panel = () => ui.idioms().panes === "split";
+  const info: PaneInfo = { panel, close: () => props.onClose("inspector") };
+  const inspector = PaneContext.Provider({
+    value: info,
+    get children() {
+      return props.inspector;
+    },
+  });
+  const panes = [<ZStack part="pane">{props.list}</ZStack>, <ZStack part="pane.detail">{props.detail}</ZStack>, <ZStack part="sidebar" variant={panel() ? "panel" : undefined}>{inspector}</ZStack>];
   return element(PANES, {
     grow: 1,
     get hidden() {
@@ -717,6 +746,10 @@ export function Panes(props: PanesViewProps): UIElement {
     },
     get inspectorWidth() {
       return props.inspectorWidth;
+    },
+    get inspectorTop() {
+      // the height of a pane's bar with its second line, and the rule under it where the theme draws one
+      return ui.metric().bar + 10 + (ui.theme.traits.unifiedBars ? 0 : 1);
     },
     onBack: close,
     children: panes as unknown as UINode,

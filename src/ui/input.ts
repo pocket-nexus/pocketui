@@ -24,6 +24,14 @@ import { firstFocus, pickFocus, type Direction, type FocusRect } from "../core/f
 import type { Instance, PanSession, ScrollTarget, UIRoot } from "./engine.ts";
 import { REST } from "./theme.ts";
 
+/** The contact id a host gives a pointer that rests on the surface without
+ *  pressing. PocketJS's touch facts carry contacts, and a host that has a
+ *  pointer and no hover channel of its own (Omarchy Pocket's stage pointer
+ *  over an applet's window) sends its position as a contact with this id: it
+ *  is read here as hover, never as a touch. A press is the host's ordinary
+ *  contact, sent in its place. */
+export const HOVER_CONTACT = 15;
+
 export interface InputOptions {
   surface: "primary" | "auxiliary";
   touch: boolean;
@@ -60,6 +68,8 @@ export interface UIInput {
   focus(instance: Instance | null, show?: boolean): void;
   /** whether the focus ring shows: a button was the last input */
   focusVisible(): boolean;
+  /** A pointer rests at a point of the surface without pressing, or (null) has left it. */
+  hover(point: { x: number; y: number } | null): void;
   /** whether the last input was a button of the pad, shown focus or not (a menu opened by a button takes the focus) */
   byPad(): boolean;
   /** handlers run newest first after the d-pad and confirm; one that returns true ends the press */
@@ -217,6 +227,17 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
   // --- buttons ---------------------------------------------------------------
   let held = 0;
   let heldFor = 0;
+  // --- a pointer at rest ------------------------------------------------------
+  let hovered: Instance | null = null;
+  const hover = (point: { x: number; y: number } | null) => {
+    const next = point ? (root.hit(point.x, point.y).find((instance) => instance.interactive) ?? null) : null;
+    if (next === hovered) return;
+    hovered?.setHovered(false);
+    hovered = next;
+    hovered?.setHovered(true);
+    // the pointer and the pad do not both point: a pointer that comes to rest on a control puts the pad's focus away
+    if (next && visible) setFocus(focused, false);
+  };
   let pad = false;
   const press = (button: number, repeat: boolean) => {
     pad = true;
@@ -284,6 +305,8 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
       surface: options.surface,
       axis: "any",
       onDown(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(c);
+        hover(null);
         pad = false;
         if (visible) setFocus(focused, false);
         const path = root.hit(c.x, c.y);
@@ -301,6 +324,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         pressTarget?.setPressed(true);
       },
       onTap(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return;
         // the up edge arrives before the tap it completes
         const target = pressTarget ?? lifted;
         lifted = null;
@@ -314,6 +338,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         if (target && text && target !== text.owner) api.setTextTarget(null);
       },
       onLongPress(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return;
         const target = pressTarget;
         if (!target) return;
         const carried = api.onLift?.(target, c.x, c.y) ?? null;
@@ -328,9 +353,11 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         }
       },
       onMove(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(c);
         drag?.move(c.x, c.y);
       },
       onPanStart(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(c);
         if (drag) return;
         releasePress();
         const path = root.hit(c.startX, c.startY);
@@ -353,11 +380,13 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         scrollTarget?.scroller.beginDrag();
       },
       onPanMove(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(c);
         if (drag) return drag.move(c.x, c.y);
         if (pan) return pan.move(c.dx, c.dy);
         scrollTarget?.scroller.drag(-c.fdy);
       },
       onPanEnd(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(null);
         if (drag) {
           drag.end(c.x, c.y, false);
           drag = null;
@@ -372,6 +401,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         scrollTarget = null;
       },
       onUp(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(null);
         if (drag) {
           drag.end(c.x, c.y, false);
           drag = null;
@@ -380,6 +410,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         releasePress();
       },
       onCancel(c: GestureContact) {
+        if (c.id === HOVER_CONTACT) return hover(null);
         if (drag) {
           drag.end(c.x, c.y, true);
           drag = null;
@@ -419,6 +450,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
       // what had the focus is gone (a pane replaced, a row removed): the focus lands again once what replaced it is laid out
       relanding = visible;
     }
+    if (instance === hovered) hovered = null;
     if (instance === pressTarget) pressTarget = null;
     if (instance === lifted) lifted = null;
     if (instance.scrollTarget() === scrollTarget) scrollTarget = null;
@@ -431,6 +463,7 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
     focus: (instance, show = visible) => setFocus(instance, show),
     focusVisible: () => visible,
     byPad: () => pad,
+    hover,
     onButton(handler) {
       handlers.push(handler);
       return () => {

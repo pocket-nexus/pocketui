@@ -32,6 +32,10 @@ const STATES: Partial<PartState>[] = [
   {},
   { pressed: true },
   { focused: true },
+  { hovered: true },
+  { hovered: true, disabled: true },
+  { variant: "overlay" },
+  { variant: "panel" },
   { disabled: true },
   { selected: true },
   { selected: true, focused: true },
@@ -82,6 +86,11 @@ describe.each(THEMES.map((theme) => [theme.id, theme] as const))("the %s theme",
       ["row", { selected: true, focused: true }],
       ["menu.item", {}],
       ["menu.item", { focused: true }],
+      ["menu.item", { hovered: true }],
+      ["menubar.item", { hovered: true }],
+      ["row", { hovered: true }],
+      ["section", { variant: "panel" }],
+      ["picker", {}],
       ["menu.item", { selected: true }],
       ["button", { variant: "filled" }],
       ["button", { variant: "filled", pressed: true }],
@@ -153,8 +162,13 @@ describe("themes", () => {
     expect(by("luna").captionControls).toBe("trailing");
     expect(by("aqua").defaultLast).toBe(true);
     expect(by("classic").defaultLast).toBe(false);
-    expect(by("pocket").scroll).toBe("overlay");
-    expect(by("luna").scroll).toBe("strip");
+    expect(by("pocket").picker).toBe("row");
+    expect(by("aqua").picker).toBe("popup");
+    expect(by("pocket").actions).toBe("heading");
+    expect(by("luna").actions).toBe("footer");
+    expect(by("aqua").unifiedBars).toBe(true);
+    // a scroll bar is a thumb over the content in every shipped theme: a strip takes width and wants a pointer
+    for (const theme of THEMES) expect(theme.traits.scroll).toBe("overlay");
   });
 });
 

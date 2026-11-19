@@ -9,6 +9,7 @@
 // The offset is PocketJS's kinetic scroller (framework/src/kinetics-core.ts):
 // finger-follow, fling, rubber band and the d-pad's chase are its own, fixed
 // step and deterministic.
+import { OverlayThumb } from "./thumb.ts";
 import { createRenderEffect, onCleanup } from "solid-js";
 import { createScroller, type Scroller } from "@pocketjs/framework/kinetics";
 import { createElement, insertNode, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
@@ -42,16 +43,12 @@ export class ScrollInstance extends Container implements ScrollHandle {
   readonly scroller: Scroller;
   private contentH = 0;
   private spacing = 0;
-  private barStyle: Record<string, number | string> = {};
-  private bar: NodeMirror;
-  private barShown = 0;
+  private thumb: OverlayThumb;
 
   constructor(private readonly scrollProps: ScrollProps, parent: Instance | null, root: UIRoot) {
     super(scrollProps, parent, root);
     const content = this.host;
-    this.bar = createElement("view");
-    setProp(this.bar, "style", { posType: 1, width: 2, radius: 1, opacity: 0 });
-    insertNode(this.node, this.bar);
+    this.thumb = new OverlayThumb(this.node, root);
     setProp(this.node, "style", { overflow: 1 });
     this.scroller = createScroller({ max: () => this.max(), extent: () => this.h || 1 });
     createRenderEffect(() => {
@@ -67,7 +64,7 @@ export class ScrollInstance extends Container implements ScrollHandle {
       contentStyle = next;
       if (offset !== last) {
         last = offset;
-        this.barShown = 40;
+        this.thumb.touch();
         scrollProps.onScroll?.(offset);
         if (scrollProps.onNearEnd && this.max() - offset < this.h) scrollProps.onNearEnd();
       }
@@ -94,23 +91,8 @@ export class ScrollInstance extends Container implements ScrollHandle {
   }
 
   private paintBar(): void {
-    const max = this.max();
-    // where the theme's scroll bar is a strip beside the content (ui/scrollbar.ts), there is no thumb over it
-    const theme = this.root.theme;
-    const shown = max > 0 && this.barShown > 0 && (theme.traits.scroll === "overlay" || this.scrollProps.bar === "never");
-    if (this.barShown > 0) this.barShown--;
-    const next: Record<string, number | string> = { opacity: shown ? 0.8 : 0 };
-    if (shown) {
-      next.bgColor = theme.color.faint;
-      const track = this.h - 4;
-      const length = Math.max(12, (track * this.h) / (this.h + max));
-      const offset = Math.min(max, Math.max(0, this.scroller.offset()));
-      next.insetL = this.w - 4;
-      next.insetT = 2 + ((track - length) * offset) / max;
-      next.height = length;
-    }
-    setProp(this.bar, "style", next, this.barStyle);
-    this.barStyle = { ...this.barStyle, ...next };
+    const strip = this.root.theme.traits.scroll === "strip" && this.scrollProps.bar !== "never";
+    this.thumb.frame(this, this.max(), this.scroller.offset(), strip);
   }
 
   protected measureContent(maxW: number, maxH: number): Size {

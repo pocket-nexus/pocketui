@@ -9,6 +9,7 @@ export type { TextProps } from "./ui/textview.ts";
 export type { Environment, Idioms } from "./core/env.ts";
 export { deriveEnvironment, resolveIdioms } from "./core/env.ts";
 export { PocketUI, useUI, type UI } from "./ui/mount.ts";
+export { HOVER_CONTACT } from "./ui/input.ts";
 export { defineTheme, FACES, PIXEL_FACES, REST, withFaces, type Bevel, type Face, type Fill, type GlyphArt, type GlyphName, type GlyphShape, type Ink, type Layer, type Paint, type Palette, type Part, type PartState, type TextRole, type Theme, type Traits } from "./core/theme.ts";
 export { AQUA_THEME, CLASSIC_THEME, DARK, DEFAULT_THEME, LUNA_THEME, POCKET_THEME, themeById, THEMES } from "./themes/index.ts";
 export { bitmap, NO_GLYPH, stockGlyph, stroke } from "./core/glyphs.ts";

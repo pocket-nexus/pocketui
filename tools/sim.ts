@@ -16,6 +16,7 @@
 //   press:NAME          a button: UP DOWN LEFT RIGHT CIRCLE CROSS TRIANGLE SQUARE LTRIGGER RTRIGGER START SELECT
 //   type:TEXT           the keyboard commits TEXT        key:NAME   an editing key
 //   shot:FILE           a PNG of the surface             texts      print the painted texts
+//   hover:X,Y           a pointer comes to rest there without pressing, until hover:off
 //   cmd:ID              run one of the application's commands by its id (through globalThis.__pocketUI)
 //   theme:ID            ask the application for another theme (globalThis.__pocketUISetTheme, where it sets one)
 //
@@ -81,6 +82,8 @@ export interface Sim {
   drag(x0: number, y0: number, x1: number, y1: number, frames?: number): Promise<void>;
   /** a contact held still (a long press), then moved and let go: a drag of a lifted thing */
   lift(x0: number, y0: number, x1: number, y1: number, hold?: number, frames?: number): Promise<void>;
+  /** where a pointer rests without pressing, while it does */
+  hoverAt?: [number, number] | null;
   /** called while a `lift` is still down at its end point */
   mid?: () => void;
   press(name: string, settle?: number): Promise<void>;
@@ -106,7 +109,8 @@ export async function bootSim(guest: string, options: SimOptions): Promise<Sim> 
     console: app,
     async run(frames) {
       for (let i = 0; i < frames; i++) {
-        await app.step();
+        // a pointer at rest is a contact with the hover id (src/ui/input.ts HOVER_CONTACT), every frame it rests
+        await app.step(sim.hoverAt ? { touches: [{ id: 15, x: sim.hoverAt[0], y: sim.hoverAt[1] }], surface } : undefined);
         // a service that works in real time (a glyph atlas being drawn) gets it
         for (let waited = 0; options.busy && options.busy() > 0 && waited < 400; waited++) await new Promise((done) => setTimeout(done, 5));
       }
@@ -156,6 +160,7 @@ export async function runSteps(sim: Sim, steps: string): Promise<void> {
       case "lift": await sim.lift(nums[0]!, nums[1]!, nums[2]!, nums[3]!, nums[4] ?? 40, nums[5] ?? 16); break;
       case "liftshot": sim.mid = () => sim.shot(arg); break;
       case "press": await sim.press(arg); break;
+      case "hover": sim.hoverAt = arg === "off" ? null : [nums[0]!, nums[1]!]; await sim.run(3); break;
       case "type": await sim.type(arg); break;
       case "key": await sim.key(arg); break;
       case "shot": sim.shot(arg); console.log(`shot ${arg}`); break;

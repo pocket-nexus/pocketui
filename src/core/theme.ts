@@ -232,6 +232,8 @@ export type Part = (typeof PARTS)[number];
 export interface PartState {
   pressed: boolean;
   focused: boolean;
+  /** a pointer rests on it (a surface without a pointer never says so) */
+  hovered: boolean;
   disabled: boolean;
   /** the row that is open, the tab that shows, the toggle that is on */
   selected: boolean;
@@ -242,7 +244,7 @@ export interface PartState {
   tone: Tone | undefined;
 }
 
-export const REST: PartState = { pressed: false, focused: false, disabled: false, selected: false, active: true, variant: undefined, tone: undefined };
+export const REST: PartState = { pressed: false, focused: false, hovered: false, disabled: false, selected: false, active: true, variant: undefined, tone: undefined };
 
 // ---------------------------------------------------------------------------
 // Marks

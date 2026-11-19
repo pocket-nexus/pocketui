@@ -142,7 +142,7 @@ export const AQUA_THEME = defineTheme({
     actions: "footer",
     picker: "popup",
     back: "glyph",
-    scroll: "strip",
+    scroll: "overlay",
     scrollButtons: false,
     sheets: "window",
     dialogCaption: false,
@@ -157,7 +157,8 @@ export const AQUA_THEME = defineTheme({
     canvas: { fill: WINDOW },
     pane: { fill: WHITE },
     "pane.detail": { fill: WHITE },
-    sidebar: { fill: "#e3e9f1", ink: { muted: "#5c6a7c", faint: "#7c8a9c" } },
+    // as a column, the pale blue of a source list; over another pane, a panel of the window's own grey with an edge and a shadow
+    sidebar: (s) => (s.variant === "panel" ? { fill: WINDOW, shadow: 3, under: [{ l: 0, w: 1, fill: "#8e8e8e" }], pad: [0, 0, 0, 1] } : { fill: "#e3e9f1", ink: { muted: "#5c6a7c", faint: "#7c8a9c" } }),
     caption: captionPaint,
     "caption.button": (s) => {
       const live = !s.disabled && s.active;
@@ -165,7 +166,7 @@ export const AQUA_THEME = defineTheme({
       return { gradient: [stops[0], stops[1]], border: stops[2], radius: 6, opacity: s.pressed ? 0.75 : 1, under: [{ t: 1, l: 3, r: 3, h: 4, radius: 2, gradient: ["#ffffffd0", "#ffffff20"] }] };
     },
     menubar: { gradient: ["#f6f6f6", "#e2e2e2"], pad: [0, 6] },
-    "menubar.item": (s) => ({ gradient: s.selected || s.pressed ? ["#5f93e8", "#2d66d0"] : undefined, pad: [3, 8], ink: s.selected || s.pressed ? ON_BLUE : undefined }),
+    "menubar.item": (s) => ({ gradient: s.selected || s.pressed || s.hovered ? ["#5f93e8", "#2d66d0"] : undefined, pad: [3, 8], ink: s.selected || s.pressed || s.hovered ? ON_BLUE : undefined }),
     status: { gradient: ["#e9e9e9", "#d6d6d6"], pad: [0, 10], under: [{ t: 0, h: 1, fill: "#a9a9a9" }, { t: 1, h: 1, fill: "#f6f6f6" }], ink: { text: "#3c3c3c" } },
     "status.cell": {},
     bar: (s) => (s.variant === "footer" ? { fill: "#e4e4e4", under: [{ t: 0, h: 1, fill: "#bdbdbd" }] } : { gradient: [SHEET[1], SHEET[2]], pad: [0, 8], under: [{ b: 0, h: 1, fill: "#7f7f7f" }], ink: { muted: "#3f3f3f" } }),
@@ -174,15 +175,15 @@ export const AQUA_THEME = defineTheme({
       if (s.selected) return { ...gel(GRAPHITE, CAPSULE), pad: [0, 11], ink: { accent: WHITE, bad: WHITE, text: WHITE } };
       return { ...gel(s.pressed ? CLEAR_DOWN : CLEAR, CAPSULE), pad: [0, 11], ink: { accent: "#1c1c1c", bad: c.bad, text: "#1c1c1c" } };
     },
-    row: (s) => (s.selected ? { gradient: ["#5d94d6", "#2f6fc4"], pad: [5, 10], ink: ON_BLUE, under: [{ t: 0, h: 1, fill: "#76a4de" }] } : { fill: s.pressed ? "#e6eefb" : undefined, pad: [5, 10] }),
-    section: { fill: "#f1f4f8", pad: [6, 10, 3, 10], text: "caption", ink: { text: "#62707f", faint: "#8a96a4" } },
+    row: (s) => (s.selected ? { gradient: ["#5d94d6", "#2f6fc4"], pad: [5, 10], ink: ON_BLUE, under: [{ t: 0, h: 1, fill: "#76a4de" }] } : { fill: s.pressed ? "#dfe9fa" : s.hovered ? "#eef3fb" : undefined, pad: [5, 10] }),
+    section: (s) => (s.variant === "panel" ? { gradient: ["#e9e9e9", "#d5d5d5"], pad: [4, 8, 4, 10], text: "strong", ink: { text: "#2a2a2a" }, under: [{ b: 0, h: 1, fill: "#a2a2a2" }] } : { fill: "#f1f4f8", pad: [6, 10, 3, 10], text: "caption", ink: { text: "#62707f", faint: "#8a96a4" } }),
     // between rows a hair; between panes the edge of a column, which crosses the bars
     divider: (s) => ({ fill: s.variant === "panes" ? "#9d9d9d" : "#e0e0e0" }),
     button,
     field: (s) => ({ fill: WHITE, border: s.tone === "good" ? c.good : s.selected ? "#5b96dd" : "#9d9d9d", radius: 3, pad: [4, 6], under: [{ t: 1, l: 1, r: 1, h: 1, fill: "#dcdcdc" }] }),
     picker: (s) => ({ ...gel(s.pressed ? CLEAR_DOWN : s.disabled ? { ...CLEAR, rim: "#b4b4b4" } : CLEAR, CAPSULE), pad: [0, 0, 0, 11], ink: s.disabled ? { text: "#9c9c9c" } : undefined, opacity: 1 }),
-    // the popup's cap: a bead of blue glass at its trailing end
-    "picker.button": (s) => ({ ...gel(s.disabled ? GRAPHITE : BLUE_GLASS, CAPSULE - 1), ink: { text: WHITE } }),
+    // the popup's cap: a bead of blue glass at its trailing end, with one soft light on its crown
+    "picker.button": (s) => ({ fill: s.disabled ? "#5a5a5a" : "#2b58a4", radius: CAPSULE - 1, ink: { text: WHITE }, under: [{ l: 1, t: 1, r: 1, b: 1, radius: CAPSULE - 2, gradient: s.disabled ? ["#a8a8a8", "#6c6c6c", "#8a8a8a"] : ["#8cc4f7", "#3a8ae4", "#62b0f2"], gradientMid: 0.5 }, { l: 5, r: 5, t: 2, h: 5, radius: 3, gradient: ["#ffffffd8", "#ffffff18"] }] }),
     toggle: (s) => gel(s.selected ? BLUE_GLASS : CLEAR, 3),
     "toggle.knob": {},
     segments: {},
@@ -198,9 +199,10 @@ export const AQUA_THEME = defineTheme({
     badge: (s) => ({ fill: badgeFill(s.tone), radius: 8, pad: [0, 6], text: "caption", ink: ALL_WHITE }),
     callout: (s) => ({ fill: s.pressed ? "#ececec" : undefined, radius: 4 }),
     tooltip: (s) => ({ fill: "#ffffc8", border: "#c8c890", shadow: 2, pad: [3, 9], ink: { text: s.tone === "bad" ? c.bad : "#000000" } }),
-    scrim: { fill: c.scrim },
+    // behind a dialog the window dims a little; behind a menu that popped up nothing does
+    scrim: (s) => (s.variant === "popover" ? {} : { fill: c.scrim }),
     menu: { fill: "#fffffff4", border: "#b0b0b0", radius: 5, shadow: 3, pad: [4, 0] },
-    "menu.item": (s) => ({ gradient: s.focused || s.pressed || s.selected ? ["#5f93e8", "#2d66d0"] : undefined, pad: [5, 14, 5, 8], ink: s.focused || s.pressed || s.selected ? ON_BLUE : undefined, showsFocus: true }),
+    "menu.item": (s) => ({ gradient: s.focused || s.pressed || s.selected || s.hovered ? ["#5f93e8", "#2d66d0"] : undefined, pad: [5, 14, 5, 8], ink: s.focused || s.pressed || s.selected || s.hovered ? ON_BLUE : undefined, showsFocus: true }),
     "menu.title": (s) => (s.variant === "menu" ? { pad: [7, 12, 4, 12], text: "caption", ink: { text: "#62707f" } } : { pad: [13, 18, 2, 18], text: "strong" }),
     separator: { fill: "#d4d4d4" },
     dialog: { fill: WINDOW, border: "#8e8e8e", radius: 6, shadow: 3 },
@@ -208,7 +210,8 @@ export const AQUA_THEME = defineTheme({
     "dialog.body": {},
     sheet: { fill: WINDOW, border: "#9a9a9a", shadow: 3 },
     "scroll.track": { gradient: ["#d2d2d2", "#eeeeee", "#fbfbfb"], gradientDir: "right", gradientMid: 0.3, under: [{ l: 0, w: 1, fill: "#a9a9a9" }] },
-    "scroll.thumb": (s) => ({ gradient: s.pressed ? ["#7fb0ea", "#2f76d2", "#5f9de3"] : ["#a9cef7", "#4288e0", "#79b2f0"], gradientDir: "right", gradientMid: 0.55, border: "#3a66ad", radius: 6, under: [{ l: 2, t: 3, b: 3, w: 3, radius: 2, gradient: ["#ffffffc0", "#ffffff40"], gradientDir: "right" }] }),
+    // a grey bar over the content that shows while it moves and takes no room; the capsule in a channel is the strip's
+    "scroll.thumb": (s) => (s.variant === "overlay" ? { fill: "#00000078", radius: 3 } : { gradient: ["#a9cef7", "#4288e0", "#79b2f0"], gradientDir: "right", gradientMid: 0.55, border: "#3a66ad", radius: 6 }),
     "scroll.button": {},
     focus: { border: "#6ea5e8", borderWidth: 3, pad: 2 },
     drag: { gradient: ["#5f93e8", "#2d66d0"], radius: 10, shadow: 2, pad: [3, 10], ink: ON_BLUE },

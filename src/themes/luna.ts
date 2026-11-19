@@ -61,7 +61,7 @@ function button(s: PartState): Paint {
   if (s.variant === "plain") return { fill: s.pressed ? "#e2dfd0" : undefined, radius: 3, pad: [4, 10], text: "body", ink: { text: s.tone === "bad" ? c.bad : c.accent } };
   if (s.variant === "pill") return { ...base, radius: 10, shadow: 1, pad: [3, 11] };
   // the focus is an orange ring inside the edge, the default button a blue one
-  if (s.focused) return { ...base, under: [{ l: 1, t: 1, r: 1, b: 1, radius: 2, border: ORANGE, borderWidth: 2 }], showsFocus: true };
+  if (s.focused || (s.hovered && !s.pressed)) return { ...base, under: [{ l: 1, t: 1, r: 1, b: 1, radius: 2, border: ORANGE, borderWidth: 2 }], showsFocus: true };
   if (s.variant === "filled" && !s.pressed) return { ...base, under: [{ l: 1, t: 1, r: 1, b: 1, radius: 2, border: "#8fb2ec", borderWidth: 2 }] };
   return base;
 }
@@ -105,7 +105,7 @@ export const LUNA_THEME = defineTheme({
     actions: "footer",
     picker: "popup",
     back: "label",
-    scroll: "strip",
+    scroll: "overlay",
     scrollButtons: true,
     sheets: "window",
     dialogCaption: true,
@@ -120,7 +120,7 @@ export const LUNA_THEME = defineTheme({
     canvas: { fill: FACE },
     pane: { fill: WHITE, border: EDGE, pad: 1 },
     "pane.detail": { fill: WHITE, border: EDGE, pad: 1 },
-    sidebar: { gradient: ["#e4ebfa", "#d3def6"], border: EDGE, pad: 1, ink: { muted: "#3f5d9c", faint: "#6b83b8", accent: "#215dc6" } },
+    sidebar: (s) => ({ gradient: ["#e4ebfa", "#d3def6"], border: s.variant === "panel" ? "#3f6bc4" : EDGE, shadow: s.variant === "panel" ? 2 : 0, pad: 1, ink: { muted: "#3f5d9c", faint: "#6b83b8", accent: "#215dc6" } }),
     caption: captionPaint,
     "caption.button": (s) => {
       const red = s.variant === "close";
@@ -128,7 +128,7 @@ export const LUNA_THEME = defineTheme({
       return { gradient: stops, gradientMid: 0.45, border: WHITE, radius: 3, ink: { text: WHITE }, opacity: s.disabled ? 0.55 : 1 };
     },
     menubar: { fill: FACE, pad: [1, 3], under: [{ b: 0, h: 1, fill: RULE }] },
-    "menubar.item": (s) => ({ fill: s.selected || s.pressed ? BLUE : undefined, pad: [3, 7], ink: s.selected || s.pressed ? ON_BLUE : undefined }),
+    "menubar.item": (s) => ({ fill: s.selected || s.pressed || s.hovered ? BLUE : undefined, pad: [3, 7], ink: s.selected || s.pressed || s.hovered ? ON_BLUE : undefined }),
     status: { fill: FACE, pad: [2, 4, 1, 4], under: [{ t: 0, h: 1, fill: "#c5c2b2" }, { t: 1, h: 1, fill: WHITE }] },
     "status.cell": { pad: [1, 4] },
     bar: { gradient: ["#fdfcf8", "#ebe8d7"], pad: [2, 5, 2, 8], under: [{ b: 0, h: 1, fill: RULE }], ink: { muted: c.muted } },
@@ -137,7 +137,7 @@ export const LUNA_THEME = defineTheme({
       if (s.selected) return { fill: WHITE, border: BLUE, radius: 3, pad: [4, 8], ink, opacity: 1 };
       return { gradient: s.pressed ? ["#dcd9c9", "#eeece2"] : ["#ffffff", "#ebe8d8"], border: s.pressed ? "#9d9a8a" : "#cdcabb", radius: 3, pad: [4, 8], ink, opacity: 1 };
     },
-    row: (s) => ({ fill: s.selected ? BLUE : s.pressed ? "#e4ecfa" : undefined, pad: [4, 8], ink: s.selected ? ON_BLUE : undefined }),
+    row: (s) => ({ fill: s.selected ? BLUE : s.pressed ? "#dfe8f8" : s.hovered ? "#f1f5fc" : undefined, pad: [4, 8], ink: s.selected ? ON_BLUE : undefined }),
     section: { fill: WHITE, pad: [7, 8, 3, 8], text: "strong", ink: { text: "#0c3dab", faint: "#6b83b8" }, under: [{ b: 0, l: 8, r: 8, h: 1, gradient: ["#7a9be0", "#ffffff"], gradientDir: "right" }] },
     divider: { fill: RULE },
     button,
@@ -161,7 +161,7 @@ export const LUNA_THEME = defineTheme({
     tooltip: (s) => ({ fill: "#ffffe1", border: "#000000", shadow: 1, pad: [3, 8], ink: { text: s.tone === "bad" ? c.bad : "#000000" } }),
     scrim: {},
     menu: { fill: WHITE, border: "#aca899", shadow: 2, pad: 2 },
-    "menu.item": (s) => ({ fill: s.focused || s.pressed || s.selected ? BLUE : undefined, pad: [5, 10, 5, 6], ink: s.focused || s.pressed || s.selected ? ON_BLUE : s.disabled ? { text: "#aca899" } : undefined, showsFocus: true, opacity: 1 }),
+    "menu.item": (s) => ({ fill: s.focused || s.pressed || s.selected || (s.hovered && !s.disabled) ? BLUE : undefined, pad: [5, 10, 5, 6], ink: s.focused || s.pressed || s.selected || (s.hovered && !s.disabled) ? ON_BLUE : s.disabled ? { text: "#aca899" } : undefined, showsFocus: true, opacity: 1 }),
     "menu.title": { pad: [4, 8], text: "strong" },
     separator: { fill: "#aca899" },
     // the window's frame is the title bar's blue, three points of it around the body
@@ -170,7 +170,7 @@ export const LUNA_THEME = defineTheme({
     "dialog.body": { fill: FACE },
     sheet: { fill: "#0a52de", shadow: 3, pad: [0, 3, 3, 3] },
     "scroll.track": { gradient: ["#f0efe8", "#fdfdfa"], gradientDir: "right" },
-    "scroll.thumb": (s) => ({ gradient: s.pressed ? ["#a9bef0", "#bdcff7"] : ["#cfdcfe", "#b6c9f6"], gradientDir: "right", border: "#ffffff", radius: 2, under: [{ l: 0, t: 0, r: 0, b: 0, radius: 3, border: "#9fb5e6" }] }),
+    "scroll.thumb": (s) => s.variant === "overlay" ? { fill: "#1d4fa8a8", radius: 2 } : ({ gradient: s.pressed ? ["#a9bef0", "#bdcff7"] : ["#cfdcfe", "#b6c9f6"], gradientDir: "right", border: "#ffffff", radius: 2, under: [{ l: 0, t: 0, r: 0, b: 0, radius: 3, border: "#9fb5e6" }] }),
     "scroll.button": (s) => ({ gradient: s.pressed ? ["#a9bef0", "#bdcff7"] : ["#cfdcfe", "#b6c9f6"], gradientDir: "right", border: "#ffffff", radius: 2, ink: { text: s.disabled ? "#aebbd8" : "#4d6185" }, opacity: 1, under: [{ l: 0, t: 0, r: 0, b: 0, radius: 3, border: "#9fb5e6" }] }),
     focus: { border: ORANGE, borderWidth: 2, pad: 1 },
     drag: { fill: "#ffffe1", border: "#000000", shadow: 1, pad: [3, 8] },

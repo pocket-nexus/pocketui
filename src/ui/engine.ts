@@ -227,6 +227,7 @@ export abstract class Instance {
   readonly props: BoxProps;
   pressed = false;
   focused = false;
+  hovered = false;
 
   /** the paint the theme gives this part now; undefined: it names no part */
   look: Accessor<Paint> | undefined;
@@ -234,6 +235,7 @@ export abstract class Instance {
   private ticks = 0;
   private decor: NodeMirror[] = [];
   private layers: readonly Layer[] = NO_LAYERS;
+  private given: readonly Layer[] = NO_LAYERS;
   /** a view node: it can hold the layers a part paints under its content (a text node cannot) */
   private readonly box: boolean;
   private nudgeX = 0;
@@ -261,7 +263,7 @@ export abstract class Instance {
         const part = props.part;
         if (!part) return NO_PAINT;
         tick();
-        return root.theme.paint(part, { pressed: this.pressed, focused: this.focused, disabled: props.disabled === true, selected: props.selected === true, active: props.active !== false, variant: props.variant, tone: props.tone });
+        return root.theme.paint(part, { pressed: this.pressed, focused: this.focused, hovered: this.hovered, disabled: props.disabled === true, selected: props.selected === true, active: props.active !== false, variant: props.variant, tone: props.tone });
       });
       this.look = look;
       // a state that only repaints (pressed) leaves the padding, and so the layout, alone
@@ -325,8 +327,21 @@ export abstract class Instance {
     const radius = props.radius ?? look.radius ?? 0;
     next.radius = radius;
     const borderColor = props.borderColor ?? look.border;
-    next.borderWidth = props.borderWidth ?? (borderColor !== undefined ? (look.borderWidth ?? 1) : 0);
-    next.borderColor = borderColor ?? CLEAR;
+    const borderWidth = props.borderWidth ?? (borderColor !== undefined ? (look.borderWidth ?? 1) : 0);
+    // A rounded box with an edge is two rounded boxes, the edge's colour and,
+    // inside it by the edge's width, the body: the core's own rounded border
+    // thins to a hair along the arcs, and a capsule's rim came out uneven.
+    let body: Layer | undefined;
+    if (this.box && radius > 0 && borderColor !== undefined && borderWidth > 0 && (gradient ? gradient.every(opaque) : background !== undefined && opaque(background))) {
+      body = { l: borderWidth, t: borderWidth, r: borderWidth, b: borderWidth, radius: Math.max(0, radius - borderWidth), fill: gradient ? undefined : background, gradient, gradientDir: look.gradientDir, gradientMid: look.gradientMid };
+      next.bgColor = borderColor;
+      next.gradDir = NO_GRADIENT;
+      next.borderWidth = 0;
+      next.borderColor = CLEAR;
+    } else {
+      next.borderWidth = borderWidth;
+      next.borderColor = borderColor ?? CLEAR;
+    }
     const bevel = radius > 0 ? undefined : look.bevel;
     next.bevelOuterLight = bevel?.outerLight ?? CLEAR;
     next.bevelOuterDark = bevel?.outerDark ?? CLEAR;
@@ -339,8 +354,9 @@ export abstract class Instance {
     next.translateX = (props.offset ? props.offset[0] : 0) + this.nudgeX;
     next.translateY = (props.offset ? props.offset[1] : 0) + this.nudgeY;
     this.style(next);
-    if (this.look) {
-      this.setLayers(look.under ?? NO_LAYERS);
+    if (this.look || body) {
+      const under = look.under ?? NO_LAYERS;
+      this.setLayers(body ? [body, ...under] : under);
       const nudge = look.nudge;
       const dx = nudge ? nudge[0] : 0;
       const dy = nudge ? nudge[1] : 0;
@@ -357,8 +373,24 @@ export abstract class Instance {
   }
 
   /** The rectangles the part paints under its content: one native node each, before the content's. */
-  private setLayers(layers: readonly Layer[]): void {
-    if (layers === this.layers) return;
+  private setLayers(given: readonly Layer[]): void {
+    if (given === this.given) return;
+    this.given = given;
+    // a rounded layer with an edge is drawn the way a rounded part is: edge, then body inside it
+    let layers = given;
+    if (given.some(rimmed)) {
+      const out: Layer[] = [];
+      for (const layer of given) {
+        if (!rimmed(layer)) {
+          out.push(layer);
+          continue;
+        }
+        const width = layer.borderWidth ?? 1;
+        out.push({ l: layer.l, t: layer.t, r: layer.r, b: layer.b, w: layer.w, h: layer.h, hFrac: layer.hFrac, radius: layer.radius, fill: layer.border, opacity: layer.opacity });
+        out.push({ ...layer, border: undefined, l: (layer.l ?? 0) + width, t: (layer.t ?? 0) + width, r: (layer.r ?? 0) + width, b: (layer.b ?? 0) + width, radius: Math.max(0, (layer.radius ?? 0) - width) });
+      }
+      layers = out;
+    }
     this.layers = layers;
     if (!this.box) return;
     const decor = this.decor;
@@ -563,6 +595,13 @@ export abstract class Instance {
     else untrack(() => this.paint());
   }
 
+  /** A pointer came to rest on it or left: a repaint where the part's look says so. */
+  setHovered(hovered: boolean): void {
+    if (hovered === this.hovered) return;
+    this.hovered = hovered;
+    if (this.bump) this.bump(++this.ticks);
+  }
+
   setFocused(focused: boolean): void {
     if (focused === this.focused) return;
     this.focused = focused;
@@ -597,6 +636,14 @@ const CLEAR = "#00000000";
 /** PROP.gradDir (contracts/spec/spec.ts ENUMS.GradDir); any other value draws the flat fill */
 const GRAD_DIR = { up: 0, down: 1, left: 2, right: 3 } as const;
 const NO_GRADIENT = -1;
+/** A colour that hides what is under it: "#rrggbb", or "#rrggbbaa" with aa at its most. */
+const opaque = (color: string): boolean => color.length <= 7 || color.slice(7).toLowerCase() === "ff";
+
+/** A layer that is a filled rounded box with an edge, pinned on all four sides: the kind drawn as two boxes. */
+function rimmed(layer: Layer): boolean {
+  if (!layer.radius || layer.border === undefined || layer.l === undefined || layer.t === undefined || layer.r === undefined || layer.b === undefined) return false;
+  return layer.gradient ? layer.gradient.every(opaque) : layer.fill !== undefined && opaque(layer.fill);
+}
 
 function sameEdges(a: Paint["pad"], b: Paint["pad"]): boolean {
   if (a === b) return true;

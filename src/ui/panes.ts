@@ -30,6 +30,8 @@ export interface PanesProps extends DeckProps {
   listWidth?: number;
   /** the inspector's width where it has a column or slides over (default 220) */
   inspectorWidth?: number;
+  /** where the inspector starts, from the top, when it slides over the detail: under the panes' bars */
+  inspectorTop?: number;
   /** the colour of the 1-point rule between columns */
   rule?: string;
 }
@@ -46,6 +48,7 @@ class PanesInstance extends DeckInstance {
       this.idiom = panesProps.idiom;
       void panesProps.listWidth;
       void panesProps.inspectorWidth;
+      void panesProps.inspectorTop;
       this.invalidate();
     });
     createRenderEffect(() => this.style({ bgColor: panesProps.rule ?? root.theme.paint("divider", { ...REST, variant: "panes" }).fill ?? root.theme.color.line }));
@@ -101,7 +104,9 @@ class PanesInstance extends DeckInstance {
       setProp(detail.node, "style", { zIndex: 0 });
     }
     if (inspector) {
-      inspector.place(w - inspectorW, 0, inspectorW, h);
+      // over the detail it is a panel under the bars, which stay in reach; as a column it is a pane like the others
+      const top = idiom === "split" ? Math.min(h, this.panesProps.inspectorTop ?? 0) : 0;
+      inspector.place(w - inspectorW, top, inspectorW, h - top);
       setProp(inspector.node, "style", { zIndex: 3 });
       const cut = this.mode() === "cut" || this.lastIdiom !== idiom || idiom === "triple";
       if (open !== this.inspectorShown || this.lastIdiom !== idiom) {

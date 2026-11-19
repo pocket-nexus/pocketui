@@ -8,6 +8,7 @@
 // moved to keep the anchor still, and the scroller is rebased by that much
 // in the same pass, so the correction and the new positions reach the screen
 // in one frame.
+import { OverlayThumb } from "./thumb.ts";
 import { createRenderEffect, createRoot, createSignal, getOwner, onCleanup, runWithOwner, untrack, type Accessor, type Owner } from "solid-js";
 import { createScroller, type Scroller } from "@pocketjs/framework/kinetics";
 import { createElement, insertNode, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
@@ -62,9 +63,7 @@ class FeedInstance<T> extends Instance implements ScrollTarget, FeedHandle {
   readonly scroller: Scroller;
   private readonly model: FeedModel;
   private readonly content: NodeMirror;
-  private readonly bar: NodeMirror;
-  private barStyle: Record<string, number | string> = {};
-  private barShown = 0;
+  private readonly thumb: OverlayThumb;
   private rows = new Map<string, Row<T>>();
   private order: Instance[] = [];
   private items: readonly T[] = [];
@@ -84,9 +83,7 @@ class FeedInstance<T> extends Instance implements ScrollTarget, FeedHandle {
     this.content = createElement("view");
     setProp(this.content, "style", { posType: 1, insetL: 0, insetT: 0 });
     insertNode(this.node, this.content);
-    this.bar = createElement("view");
-    setProp(this.bar, "style", { posType: 1, width: 2, radius: 1, opacity: 0 });
-    insertNode(this.node, this.bar);
+    this.thumb = new OverlayThumb(this.node, root);
     this.scroller = createScroller({ max: () => this.model.max(), extent: () => this.h || 1 });
 
     // the rows
@@ -129,7 +126,7 @@ class FeedInstance<T> extends Instance implements ScrollTarget, FeedHandle {
       setProp(this.content, "style", next, contentStyle);
       contentStyle = next;
       untrack(() => {
-        this.barShown = 40;
+        this.thumb.touch();
         if (this.rebasing) return;
         this.model.scrollTo(offset);
         this.afterScroll();
@@ -259,23 +256,8 @@ class FeedInstance<T> extends Instance implements ScrollTarget, FeedHandle {
   }
 
   private paintBar(): void {
-    const max = this.model.max();
-    // where the theme's scroll bar is a strip beside the content (ui/scrollbar.ts), there is no thumb over it
-    const theme = this.root.theme;
-    const shown = max > 0 && this.barShown > 0 && (theme.traits.scroll === "overlay" || this.feedProps.bar === "never");
-    if (this.barShown > 0) this.barShown--;
-    const next: Record<string, number | string> = { opacity: shown ? 0.8 : 0 };
-    if (shown) {
-      next.bgColor = theme.color.faint;
-      const track = this.h - 4;
-      const length = Math.max(12, (track * this.h) / (this.h + max));
-      const offset = Math.min(max, Math.max(0, this.scroller.offset()));
-      next.insetL = this.w - 4;
-      next.insetT = 2 + ((track - length) * offset) / max;
-      next.height = length;
-    }
-    setProp(this.bar, "style", next, this.barStyle);
-    this.barStyle = { ...this.barStyle, ...next };
+    const strip = this.root.theme.traits.scroll === "strip" && this.feedProps.bar !== "never";
+    this.thumb.frame(this, this.model.max(), this.scroller.offset(), strip);
   }
 
   override kids(): readonly Instance[] {
