@@ -145,6 +145,54 @@ describe.each(THEMES.map((theme) => [theme.id, theme] as const))("the %s theme",
   });
 });
 
+/** The points of a layer's four rounded corners, the layer resolved in a part `W` by `H`. The core rounds a box by at most half its shorter side. */
+function cornerPoints(layer: NonNullable<Paint["under"]>[number], W: number, H: number): [number, number][] {
+  const w = layer.w ?? W - (layer.l ?? 0) - (layer.r ?? 0);
+  const h = layer.h ?? (layer.hFrac !== undefined ? Math.round(H * layer.hFrac) : H - (layer.t ?? 0) - (layer.b ?? 0));
+  const x = layer.l !== undefined ? layer.l : layer.r !== undefined ? W - layer.r - w : 0;
+  const y = layer.t !== undefined ? layer.t : layer.b !== undefined ? H - layer.b - h : 0;
+  const r = Math.max(0, Math.min(layer.radius ?? 0, w / 2, h / 2));
+  const out: [number, number][] = [];
+  for (const [cx, cy, from] of [[x + r, y + r, 180], [x + w - r, y + r, 270], [x + w - r, y + h - r, 0], [x + r, y + h - r, 90]] as const) {
+    for (let step = 0; step <= 9; step++) {
+      const angle = ((from + step * 10) * Math.PI) / 180;
+      out.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+    }
+  }
+  return out;
+}
+
+describe("a rounded part's edge", () => {
+  // Found on a device: the lights of a gel are rounded boxes of their own,
+  // squarer than the capsule they sit in, and where they were set too near
+  // its rim their corners painted the rim out on the diagonals. Whatever a
+  // theme paints under a rounded part's content stays inside its edge.
+  test.each(THEMES.map((theme) => [theme.id, theme] as const))("nothing the %s theme paints under a rounded part crosses its rim", (_id, theme: Theme) => {
+    const crossed: string[] = [];
+    for (const part of PARTS) {
+      for (const partial of STATES) {
+        const paint = theme.paint(part, { ...REST, ...partial });
+        const R = paint.radius ?? 0;
+        if (R < 4 || !paint.under || paint.border === undefined) continue;
+        const inner = R - (paint.borderWidth ?? 1);
+        for (const [W, H] of [[72, Math.max(2 * R, theme.metric.control)], [200, 44], [2 * R, 2 * R]] as const) {
+          for (const layer of paint.under) {
+            for (const [px, py] of cornerPoints(layer, W, H)) {
+              // the part's corner this point is in, if it is in one
+              const cx = px < R ? R : px > W - R ? W - R : null;
+              const cy = py < R ? R : py > H - R ? H - R : null;
+              if (cx === null || cy === null) continue;
+              const reach = Math.hypot(px - cx, py - cy);
+              if (reach > inner + 0.05) crossed.push(`${part} ${JSON.stringify(partial)} at ${W}x${H}: a layer reaches ${reach.toFixed(2)} of ${inner}`);
+            }
+          }
+        }
+      }
+    }
+    expect([...new Set(crossed)].slice(0, 6)).toEqual([]);
+  });
+});
+
 describe("themes", () => {
   test("are found by id, and an unknown id is the default", () => {
     expect(themeById("aqua").id).toBe("aqua");

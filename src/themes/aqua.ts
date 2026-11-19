@@ -56,19 +56,27 @@ const BLUE_DOWN: Gel = { body: ["#78b3ec", "#2670cc", "#408fe0"], rim: "#214a8e"
 const GRAPHITE: Gel = { body: ["#7c7c7c", "#585858", "#6a6a6a"], rim: "#3e3e3e", glow: "#ffffff48" };
 
 function gel(glass: Gel, radius: number): Paint {
+  // The two lights are rounded boxes of their own, each less than half the
+  // part's height, so each one's corner radius is at most a quarter of that
+  // height: far squarer than the capsule's. Set near the rim, their corners
+  // reach across it and paint the rim out on the four diagonals. So they are
+  // inset: by `side` from the ends, where a square corner still clears the
+  // capsule's inner arc, and by 2 from the top and the foot.
+  const side = Math.max(3, Math.round(radius * 0.46));
+  const round = Math.max(1, Math.round(radius * 0.45));
   return {
     gradient: glass.body,
     gradientMid: 0.52,
     border: glass.rim,
     radius,
     under: [
-      { b: 1, l: 3, r: 3, hFrac: 0.44, radius: Math.max(1, radius - 3), gradient: ["#ffffff00", glass.glow] },
-      { t: 1, l: 3, r: 3, hFrac: 0.44, radius: Math.max(1, radius - 2), gradient: ["#fffffff0", "#ffffff30"] },
+      { b: 2, l: side, r: side, hFrac: 0.38, radius: round, gradient: ["#ffffff00", glass.glow] },
+      { t: 2, l: side, r: side, hFrac: 0.4, radius: round, gradient: ["#fffffff0", "#ffffff30"] },
     ],
   };
 }
-/** the gloss alone, for a ground that is not a capsule (a bubble, a selected row) */
-const gloss = (radius: number): Layer => ({ t: 1, l: 3, r: 3, hFrac: 0.46, radius, gradient: ["#ffffffe0", "#ffffff28"] });
+/** the gloss alone, for a ground that is not a capsule (a bubble): inset from its rounded corners for the same reason */
+const gloss = (radius: number): Layer => ({ t: 2, l: Math.max(3, Math.round(radius * 0.5)), r: Math.max(3, Math.round(radius * 0.5)), hFrac: 0.4, radius: Math.min(5, radius), gradient: ["#ffffffe0", "#ffffff28"] });
 
 const BLUE_GEL = BLUE_GLASS.body;
 
@@ -163,7 +171,7 @@ export const AQUA_THEME = defineTheme({
     "caption.button": (s) => {
       const live = !s.disabled && s.active;
       const stops = live ? (LIGHTS[s.variant ?? "close"] ?? LIGHTS.close!) : (["#f2f2f2", "#cfcfcf", "#a6a6a6"] as const);
-      return { gradient: [stops[0], stops[1]], border: stops[2], radius: 6, opacity: s.pressed ? 0.75 : 1, under: [{ t: 1, l: 3, r: 3, h: 4, radius: 2, gradient: ["#ffffffd0", "#ffffff20"] }] };
+      return { gradient: [stops[0], stops[1]], border: stops[2], radius: 6, opacity: s.pressed ? 0.75 : 1, under: [{ t: 2, l: 4, r: 4, h: 3, radius: 1.5, gradient: ["#ffffffd0", "#ffffff20"] }] };
     },
     menubar: { gradient: ["#f6f6f6", "#e2e2e2"], pad: [0, 6] },
     "menubar.item": (s) => ({ gradient: s.selected || s.pressed || s.hovered ? ["#5f93e8", "#2d66d0"] : undefined, pad: [3, 8], ink: s.selected || s.pressed || s.hovered ? ON_BLUE : undefined }),
