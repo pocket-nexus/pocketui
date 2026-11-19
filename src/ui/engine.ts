@@ -566,6 +566,13 @@ export abstract class Instance {
     return null;
   }
 
+  /** Take a pan that started on this instance at (x, y) of its rectangle, in
+   *  any direction, before a scroll view does: a selection drawn through a
+   *  field's text. Null: not this one's. */
+  claimDrag(_x: number, _y: number): PanSession | null {
+    return null;
+  }
+
   /** What a pan, the d-pad and a focus move drive when this scrolls. */
   scrollTarget(): ScrollTarget | null {
     return null;

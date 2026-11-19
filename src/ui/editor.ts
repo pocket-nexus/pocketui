@@ -18,7 +18,7 @@ import type { TextEvent } from "@pocketjs/framework/input";
 import { createElement, createTextNode, detachNode, insertNode, replaceText, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
 import { createEditor, type Editor, type EditorLayout, type EditorSnapshot } from "../core/editor.ts";
 import { layoutRich, type RichLine, type Span } from "../core/rich.ts";
-import { Instance, type BoxProps, type Kind, type Size, type UIRoot } from "./engine.ts";
+import { type PanSession, Instance, type BoxProps, type Kind, type Size, type UIRoot } from "./engine.ts";
 import type { TextTarget } from "./input.ts";
 import type { UI } from "./mount.ts";
 import { faceRevision, measureIn, resolveFace } from "./textview.ts";
@@ -440,6 +440,24 @@ class EditorInstance extends Instance implements EditorHandle, TextTarget {
       this.model.select(layout.offsetAt(Math.max(0, Math.min(layout.lines.length - 1, line)), x - this.pad.l));
     }
     this.editorProps.onPress?.();
+  }
+
+  /** A drag through the text of the field that has the keyboard draws a
+   *  selection from where it began to where it is. A field that is not being
+   *  typed in leaves the drag to the page, which scrolls. */
+  override claimDrag(x: number, y: number): PanSession | null {
+    if (!this.typing || this.editorProps.disabled) return null;
+    const at = (px: number, py: number): number => {
+      const layout = this.visualLayout();
+      const line = Math.floor((py - this.pad.t + this.scroll) / this.drawFace.line);
+      return layout.offsetAt(Math.max(0, Math.min(layout.lines.length - 1, line)), px - this.pad.l);
+    };
+    const anchor = at(x, y);
+    this.model.select(anchor);
+    return {
+      move: (dx, dy) => this.model.select(anchor, at(x + dx, y + dy)),
+      end: () => {},
+    };
   }
 
   override get interactive(): boolean {

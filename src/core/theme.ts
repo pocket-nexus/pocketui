@@ -264,6 +264,8 @@ export interface GlyphShape {
   r?: number;
   rot?: number;
   ring?: number;
+  /** a triangle in place of the rectangle, its three corners in the mark's points: x, y, w, h are then its box */
+  tri?: readonly [number, number, number, number, number, number];
   color?: string;
   gradient?: readonly [string, string];
   opacity?: number;

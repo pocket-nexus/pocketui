@@ -22,6 +22,7 @@ import { createGesture, type GestureContact } from "@pocketjs/framework/gesture"
 import { createElement, insertNode, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
 import { firstFocus, pickFocus, type Direction, type FocusRect } from "../core/focus.ts";
 import type { Instance, PanSession, ScrollTarget, UIRoot } from "./engine.ts";
+import { cornerTexture, release, textureOf } from "./raster.ts";
 import { REST } from "./theme.ts";
 
 /** The contact id a host gives a pointer that rests on the surface without
@@ -133,6 +134,20 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
   let ringStyle: Record<string, number | string> = {};
   setProp(ring, "style", { posType: 1, opacity: 0, hitPass: 1, zIndex: 900 });
   insertNode(root.host, ring, null);
+  const ringSides: NodeMirror[] = [];
+  const ringCorners: NodeMirror[] = [];
+  for (let i = 0; i < 4; i++) {
+    const side = createElement("view");
+    setProp(side, "style", { posType: 1, hitPass: 1, display: 1 });
+    insertNode(ring, side);
+    ringSides.push(side);
+    const corner = createElement("image");
+    setProp(corner, "style", { posType: 1, hitPass: 1, display: 1 });
+    insertNode(ring, corner);
+    ringCorners.push(corner);
+  }
+  let ringShape = "";
+  let ringKey: string | null = null;
   /** Whether an instance is in what is shown now: a pane a deck has covered keeps its place and is not. */
   const onScreen = (instance: Instance): boolean => {
     for (let at = instance; at.parent; at = at.parent) if (!at.parent.kids().includes(at)) return false;
@@ -148,13 +163,52 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
       const paint = theme.paint("focus", REST);
       const out = typeof paint.pad === "number" ? paint.pad : 1;
       const rect = focused!.frame();
+      const w = rect.w + 2 * out;
+      const h = rect.h + 2 * out;
+      const width = paint.borderWidth ?? 2;
+      const color = paint.border ?? theme.color.accent;
+      const radius = Math.min(w / 2, h / 2, paint.radius ?? Math.max(0, (look?.radius ?? focused!.props.radius ?? theme.metric.radius) + out));
       next.insetL = rect.x - out;
       next.insetT = rect.y - out;
-      next.width = rect.w + 2 * out;
-      next.height = rect.h + 2 * out;
-      next.borderWidth = paint.borderWidth ?? 2;
-      next.borderColor = paint.border ?? theme.color.accent;
-      next.radius = paint.radius ?? Math.max(0, (look?.radius ?? focused!.props.radius ?? theme.metric.radius) + out);
+      next.width = w;
+      next.height = h;
+      // A ring with round corners is four straight sides and four corner
+      // pictures (ui/raster.ts): the core draws a rounded border in steps a
+      // logical pixel high. A square one is the node's own border.
+      const key = radius >= 1 ? cornerTexture(radius, width, color) : null;
+      const shape = `${w}|${h}|${width}|${radius}|${color}|${key !== null}`;
+      if (key === null) {
+        next.borderWidth = width;
+        next.borderColor = color;
+        next.radius = radius;
+      } else {
+        next.borderWidth = 0;
+        next.radius = 0;
+      }
+      if (shape !== ringShape) {
+        ringShape = shape;
+        const sides: [number, number, number, number][] = [
+          [radius, 0, w - 2 * radius, width],
+          [radius, h - width, w - 2 * radius, width],
+          [0, radius, width, h - 2 * radius],
+          [w - width, radius, width, h - 2 * radius],
+        ];
+        const corners: [number, number, number, number][] = [
+          [0, 0, 1, 1],
+          [w - radius, 0, -1, 1],
+          [0, h - radius, 1, -1],
+          [w - radius, h - radius, -1, -1],
+        ];
+        for (let i = 0; i < 4; i++) {
+          const [x, y, sw, sh] = sides[i]!;
+          setProp(ringSides[i]!, "style", { insetL: x, insetT: y, width: Math.max(0, sw), height: Math.max(0, sh), bgColor: color, display: key === null || sw <= 0 || sh <= 0 ? 1 : 0 });
+          const [cx, cy, fx, fy] = corners[i]!;
+          setProp(ringCorners[i]!, "style", { insetL: cx, insetT: cy, width: radius, height: radius, scaleX: fx, scaleY: fy, display: key === null ? 1 : 0 });
+          if (key !== null) getOps().setImage(ringCorners[i]!.id, textureOf(key));
+        }
+        release(ringKey);
+        ringKey = key;
+      } else release(key);
     }
     setProp(ring, "style", next, ringStyle);
     ringStyle = { ...ringStyle, ...next };
@@ -363,6 +417,13 @@ export function attachInput(root: UIRoot, options: InputOptions): UIInput {
         const path = root.hit(c.startX, c.startY);
         const vertical = Math.abs(c.dy) >= Math.abs(c.dx);
         scrollTarget = null;
+        // what the contact started on may want the drag itself, whichever way it goes
+        const first = path[0];
+        if (first) {
+          const frame = first.frame();
+          pan = first.claimDrag(c.startX - frame.x, c.startY - frame.y);
+          if (pan) return;
+        }
         if (vertical) {
           for (const instance of path) {
             const target = instance.scrollTarget();

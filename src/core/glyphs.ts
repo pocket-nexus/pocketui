@@ -80,13 +80,10 @@ export function stockGlyph(name: GlyphName, s: number): GlyphArt {
       shapes.push(stroke(s / 2, s / 2, s * 0.84, t, 0), stroke(s / 2, s / 2, s * 0.84, t, 90));
       break;
     case "updown": {
-      // two solid arrowheads pointing apart, a clear gap between their bases: three courses each of a stepped triangle
-      const course = s * 0.095;
-      for (let i = 0; i < 3; i++) {
-        const width = s * (0.14 + i * 0.19);
-        shapes.push({ x: (s - width) / 2, y: s * 0.07 + i * course, w: width, h: course + 0.02 });
-        shapes.push({ x: (s - width) / 2, y: s * 0.93 - (i + 1) * course, w: width, h: course + 0.02 });
-      }
+      // two solid arrowheads pointing apart, a clear gap between their bases
+      const half = s * 0.27;
+      shapes.push({ x: s / 2 - half, y: s * 0.08, w: half * 2, h: s * 0.3, tri: [s / 2, s * 0.08, s / 2 + half, s * 0.38, s / 2 - half, s * 0.38] });
+      shapes.push({ x: s / 2 - half, y: s * 0.62, w: half * 2, h: s * 0.3, tri: [s / 2 - half, s * 0.62, s / 2 + half, s * 0.62, s / 2, s * 0.92] });
       break;
     }
     case "grip":

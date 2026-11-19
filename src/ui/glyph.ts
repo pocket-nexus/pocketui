@@ -9,8 +9,11 @@
 import { createRenderEffect } from "solid-js";
 import { createElement, detachNode, insertNode, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
 import { Instance, type BoxProps, type Kind, type Size, type UIRoot } from "./engine.ts";
+import { onCleanup } from "solid-js";
+import { getOps } from "@pocketjs/framework/host";
 import { stockGlyph } from "../core/glyphs.ts";
-import { REST, type GlyphArt, type GlyphName, type PartState } from "./theme.ts";
+import { markTexture, release, textureOf, wantsRaster } from "./raster.ts";
+import { REST, type GlyphArt, type GlyphName, type GlyphShape, type PartState } from "./theme.ts";
 
 export interface GlyphProps extends BoxProps {
   glyph: GlyphName;
@@ -23,6 +26,24 @@ export interface GlyphProps extends BoxProps {
 }
 
 const CLEAR = "#00000000";
+
+/** A triangle as three level rectangles, for a host that shows no pictures. */
+function stepped(shape: GlyphShape): GlyphShape[] {
+  const [ax, ay, bx, by, cx, cy] = shape.tri!;
+  const top = Math.min(ay, by, cy);
+  const bottom = Math.max(ay, by, cy);
+  const apexUp = [ay, by, cy].filter((y) => y === top).length === 1;
+  const left = Math.min(ax, bx, cx);
+  const right = Math.max(ax, bx, cx);
+  const course = (bottom - top) / 3;
+  const out: GlyphShape[] = [];
+  for (let i = 0; i < 3; i++) {
+    const share = ((apexUp ? i : 2 - i) + 0.5) / 3;
+    const width = (right - left) * share;
+    out.push({ x: (left + right - width) / 2, y: top + i * course, w: width, h: course + 0.02, color: shape.color, opacity: shape.opacity });
+  }
+  return out;
+}
 
 class GlyphInstance extends Instance {
   private marks: NodeMirror[] = [];
@@ -42,10 +63,37 @@ class GlyphInstance extends Instance {
       this.draw();
       if (resized) this.invalidate();
     });
+    onCleanup(() => release(this.pictureKey));
+  }
+
+  private picture: NodeMirror | undefined;
+  private pictureKey: string | null = null;
+
+  /** The mark as one picture, where it has a slope or a curve and the host shows pictures. */
+  private drawPicture(): boolean {
+    const key = wantsRaster(this.art) ? markTexture(this.art, this.ink) : null;
+    if (key !== this.pictureKey) {
+      release(this.pictureKey);
+      this.pictureKey = key;
+    } else release(key);
+    if (!key) {
+      if (this.picture) setProp(this.picture, "style", { display: 1 });
+      return false;
+    }
+    for (const mark of this.marks.splice(0)) detachNode(this.node, mark);
+    if (!this.picture) {
+      this.picture = createElement("image");
+      insertNode(this.node, this.picture);
+    }
+    setProp(this.picture, "style", { posType: 1, hitPass: 1, display: 0, insetL: Math.max(0, (this.w - this.art.w) / 2), insetT: Math.max(0, (this.h - this.art.h) / 2), width: this.art.w, height: this.art.h });
+    getOps().setImage(this.picture.id, textureOf(key));
+    return true;
   }
 
   private draw(): void {
-    const { shapes } = this.art;
+    if (this.drawPicture()) return;
+    // a triangle without a picture: three courses of a stepped one
+    const shapes = this.art.shapes.flatMap((shape) => (shape.tri ? stepped(shape) : [shape]));
     const marks = this.marks;
     while (marks.length > shapes.length) detachNode(this.node, marks.pop()!);
     while (marks.length < shapes.length) {
