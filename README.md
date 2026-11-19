@@ -97,7 +97,17 @@ A row is an ordinary element. When its content changes (a paragraph streaming in
 
 `Text` wraps one style; `RichText` wraps several (bold beside regular, `code` in a sentence, a mention), breaking at spaces, on either side of a CJK character and never before closing punctuation, and never inside a word whose style changes mid-way.
 
-The type ramp is five baked slots (12 px regular and bold, 14 px bold, 12 px monospace, 10 px). **At raster density 3 a 12 px slot is about 220 KiB, and an applet's pack is at most 3 MiB.** Text the baked faces cannot draw goes to a resolver the application installs (`setFaceResolver`): Pocket Lody's asks the companion's glyphs service for an atlas and draws from slots 21 and 22.
+The type ramp is five baked slots (12 px regular and bold, 14 px bold, 12 px monospace, 10 px). **At raster density 3 a 12 px slot is about 220 KiB, and an applet's pack is at most 3 MiB.** The baked faces hold ASCII.
+
+Everything else is drawn from two **run-time faces**, regular and bold (13 px, slots 21 and 22), which an application turns on with `installRuntimeText({ density, transport })` before it mounts. The transport is its way to a glyph service: one function that takes `{ px, bold, slot, density, text, ascii: false }` and returns a FONT ATLAS of those characters. From then on:
+
+- A paragraph is set **by run**: ASCII in the baked proportional face of its role, a CJK character or a word with a letter outside ASCII in the run-time face of its weight, side by side on one line. Curly quotes, dashes and an ellipsis in English prose are folded to ASCII and stay baked; beside Chinese they are drawn as they are.
+- A face is a table that **only grows**. A text names its characters; the ones the table lacks are asked for, a few hundred to a request, and nothing else is: a reply is the new glyphs, not the face again. What arrived by a frame is loaded as one atlas, and the texts that waited lay out once. A glyph that is here stays, so scrolling back over text costs no request and no load. Past `capacity` (4096 by default) the glyphs no mounted text has named for longest go.
+- Widths come from the table, not the host. A character on its way is an empty advance of the face's size, which is the width a CJK glyph arrives with, so the line does not move when it does.
+- `prefetch(texts)` on the handle asks ahead for text that has arrived and is not on screen yet, behind anything that is.
+- Without a service (the first request fails and nothing has loaded) text shows `·` for what cannot be drawn, in the baked face, and the service is tried again every few seconds. On a host that loads no atlas the module does nothing.
+
+A glyph is a codepoint and text runs left to right: no shaping, no joining, no right-to-left. That is what makes a glyph a table lookup and a paragraph's width a sum. `core/glyphfont.ts` (the table, the runs) and `core/runtimefaces.ts` (what is asked for and when it loads) are pure; `ui/runtimetext.ts` binds them to the host. An application with its own source of glyphs can still install a `setFaceResolver`, which is asked when no run-time text is installed.
 
 `Markdown` maps a parsed document (`core/markdown.ts`: fences, lists, quotes, tables, emphasis next to CJK without spaces) to elements. A block keeps its element while its content is the same, and a paragraph, heading or fence that only grew keeps its element and changes its text, so an answer being streamed lays out its last block and nothing above it. The parser reads a 64 KB document in under 1 ms on an M-series Mac.
 

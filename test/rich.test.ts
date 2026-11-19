@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { layoutRich, type Span } from "../src/core/rich.ts";
+import { clampRich, layoutRich, type Span } from "../src/core/rich.ts";
 
 // 6 px per ASCII character, 12 per wide one; style 1 (bold) is 7 px
 const measure = (text: string, style: number) => {
@@ -41,5 +41,21 @@ describe("layoutRich", () => {
   });
   test("maxLines stops", () => {
     expect(show([{ text: "one two three four five", style: 0 }], 42, 2)).toEqual(["0:one two@0", "0:three@0"]);
+  });
+});
+
+describe("clampRich", () => {
+  const clamp = (spans: Span[], width: number, maxLines: number) => clampRich(layoutRich(spans, width, measure, maxLines + 1), maxLines, width, measure, 9).map((line) => line.segments.map((s) => `${s.style}:${s.text}@${s.x}`).join("|"));
+  test("lines that fit are left alone", () => {
+    expect(clamp([{ text: "the quick brown fox", style: 0 }], 60, 2)).toEqual(["0:the quick@0", "0:brown fox@0"]);
+  });
+  test("the last kept line ends in an ellipsis of the given style", () => {
+    expect(clamp([{ text: "the quick brown fox jumps", style: 0 }], 60, 2)).toEqual(["0:the quick@0", "0:brown f@0|9:...@42"]);
+  });
+  test("the ellipsis takes room from the run before it, whatever its style", () => {
+    expect(clamp([{ text: "运行", style: 0 }, { text: "测试然后提交代码", style: 1 }], 60, 1)).toEqual(["0:运行@0|1:测@24|9:...@36"]);
+  });
+  test("a wide width keeps the line and adds the ellipsis", () => {
+    expect(clamp([{ text: "one\ntwo", style: 0 }], 200, 1)).toEqual(["0:one@0|9:...@18"]);
   });
 });

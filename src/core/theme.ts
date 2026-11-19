@@ -18,7 +18,7 @@
 // bundle names, at the target's raster density, and an applet's pack is at
 // most 3 MiB: at density 3 a 12 px slot is about 220 KiB, so five baked slots
 // are about 1.1 MiB. Text from the network in other scripts draws from two
-// run-time slots the glyphs service fills (ui/glyphs.ts).
+// run-time slots a glyph service fills (ui/runtimetext.ts).
 
 /** A face: the font slot and the line it sets. */
 export interface Face {
@@ -60,7 +60,7 @@ export const PIXEL_FACES: Readonly<Record<TextRole, Face>> = {
   mono: FACES.mono,
 };
 
-/** The run-time faces: any script, 13 px, loaded by ui/glyphs.ts. */
+/** The run-time faces: any script, 13 px, loaded by ui/runtimetext.ts. */
 export const RICH_FACE: Face = { slot: 21, size: 13, line: 18 };
 export const RICH_BOLD_FACE: Face = { slot: 22, size: 13, line: 18, bold: true };
 

@@ -1,15 +1,16 @@
 // PocketUI ui/richview.ts — the RichText element: one wrapped paragraph in
 // several styles (core/rich.ts breaks it into lines and segments).
 //
-// A segment is one native text node at its x and line; a span with a
-// background (inline code, a mention) gets a rounded view behind its
+// A span is set by run (ui/textview.ts): ASCII in its face, the rest in the
+// run-time face of its weight. A segment is one native text node at its x and
+// line; a span with a background (inline code, a mention) gets a rounded view behind its
 // segments. Nodes are kept and reused across layouts: a paragraph that
 // streams in changes the last node's text and adds one now and then.
 import { createRenderEffect } from "solid-js";
 import { createElement, createTextNode, detachNode, insertNode, replaceText, setProp, type NodeMirror } from "@pocketjs/framework/renderer";
 import { layoutRich, type RichLine, type Span } from "../core/rich.ts";
 import { Instance, type BoxProps, type Kind, type Size, type UIRoot } from "./engine.ts";
-import { resolveFace, measureIn } from "./textview.ts";
+import { faceRevision, measureIn, resolveFace, resolveRuns, textCounters } from "./textview.ts";
 import type { Face, TextRole, Tone } from "./theme.ts";
 
 export interface RichSpan {
@@ -50,6 +51,21 @@ interface Cell {
   style: Record<string, number | string>;
 }
 
+function sameLines(a: readonly RichLine[], b: readonly RichLine[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let l = 0; l < a.length; l++) {
+    const left = a[l]!;
+    const right = b[l]!;
+    if (left.width !== right.width || left.segments.length !== right.segments.length) return false;
+    for (let s = 0; s < left.segments.length; s++) {
+      const one = left.segments[s]!;
+      const other = right.segments[s]!;
+      if (one.text !== other.text || one.x !== other.x || one.style !== other.style || one.width !== other.width) return false;
+    }
+  }
+  return true;
+}
+
 class RichTextInstance extends Instance {
   private spans: Span[] = [];
   private styles: Style[] = [];
@@ -58,6 +74,9 @@ class RichTextInstance extends Instance {
   private cells: Cell[] = [];
   private fills: { node: NodeMirror; style: Record<string, number | string> }[] = [];
   private shape = "";
+  private body = "";
+  private pending = false;
+  private waited = false;
 
   constructor(private readonly richProps: RichTextProps, parent: Instance | null, root: UIRoot) {
     super(richProps, parent, root);
@@ -71,26 +90,46 @@ class RichTextInstance extends Instance {
       const index = new Map<string, number>();
       const spans: Span[] = [];
       let line = base.line;
+      let pending = false;
       for (const span of props.spans) {
         const role = span.role;
         const wanted = role === undefined ? base : typeof role === "string" ? theme.face[role] : role;
-        const resolved = resolveFace(span.text, wanted);
         const color = span.color ?? (span.tone !== undefined ? this.inkFor(span.tone) : baseColor);
         const background = span.background ?? (span.ground === "code" ? theme.color.raised : span.ground === "chip" ? theme.color.selected : undefined);
-        const key = `${resolved.face.slot}|${color}|${background ?? ""}`;
-        let style = index.get(key);
-        if (style === undefined) {
-          style = styles.length;
-          styles.push({ face: resolved.face, color, background });
-          index.set(key, style);
+        const styleOf = (face: Face): number => {
+          const key = `${face.slot}/${face.line}|${color}|${background ?? ""}`;
+          let style = index.get(key);
+          if (style === undefined) {
+            style = styles.length;
+            styles.push({ face, color, background });
+            index.set(key, style);
+          }
+          if (face.line > line) line = face.line;
+          return style;
+        };
+        // a span that never breaks is one piece in one face; the rest are set by run
+        if (span.atomic) {
+          const whole = resolveFace(span.text, wanted);
+          if (whole.pending) pending = true;
+          spans.push({ text: whole.text, style: styleOf(whole.face), atomic: true });
+          continue;
         }
-        if (resolved.face.line > line) line = resolved.face.line;
-        spans.push({ text: resolved.text, style, atomic: span.atomic });
+        const resolved = resolveRuns(span.text, wanted);
+        if (resolved.pending) pending = true;
+        for (const run of resolved.runs) spans.push({ text: run.text, style: styleOf(run.face) });
       }
       // the same runs in the same faces: a colour changed at most (an ancestor's state, a theme of the same faces)
-      const shape = spans.map((span) => `${span.style}\u0001${span.text}`).join("\u0002") + styles.map((style) => `${style.face.slot}/${style.face.line}`).join(",") + `|${line}`;
+      const body = spans.map((span) => `${span.style}\u0001${span.text}`).join("\u0002") + styles.map((style) => `${style.face.slot}/${style.face.line}`).join(",") + `|${line}`;
+      // while a glyph is on its way the revision is part of it: each arrival is looked at
+      const shape = pending ? `${faceRevision()}|${body}` : body;
       const same = shape === this.shape;
+      // the same text in the same faces, laid out before with a glyph missing: what changed is that glyphs arrived
+      const arrival = !same && this.pending && body === this.body;
+      const before = this.laid;
+      if (!same) this.waited = arrival;
+      this.pending = pending;
       this.shape = shape;
+      this.body = body;
       this.spans = spans;
       this.styles = styles;
       this.line = line;
@@ -99,6 +138,8 @@ class RichTextInstance extends Instance {
         return;
       }
       this.laid = null;
+      // glyphs that arrive as wide as the places kept for them move nothing: the same lines, the same nodes (ui/textview.ts)
+      if (arrival && before && this.placed && sameLines(before.lines, this.layout(before.width))) return;
       this.invalidate();
     });
   }
@@ -106,8 +147,13 @@ class RichTextInstance extends Instance {
   private layout(width: number): RichLine[] {
     const laid = this.laid;
     if (laid && laid.width === width) return laid.lines;
+    textCounters.layouts++;
+    if (this.waited) {
+      textCounters.relayouts++;
+      this.waited = false;
+    }
     const styles = this.styles;
-    const lines = layoutRich(this.spans, width, (text, style) => measureIn(styles[style]!.face.slot)(text) + (styles[style]!.background ? 0 : 0), this.richProps.lines ?? Infinity);
+    const lines = layoutRich(this.spans, width, (text, style) => measureIn(styles[style]!.face.slot)(text), this.richProps.lines ?? Infinity);
     this.laid = { width, lines };
     return lines;
   }

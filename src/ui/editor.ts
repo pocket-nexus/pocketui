@@ -179,11 +179,13 @@ class EditorInstance extends Instance implements EditorHandle, TextTarget {
     const spans: Span[] = [];
     const starts: number[] = [];
     let at = 0;
-    const resolved = resolveFace(text, this.face);
+    // the whole field in one face, character for character: the run-time face once anything is outside ASCII
+    const resolved = resolveFace(text, this.face, true);
     this.drawFace = resolved.face;
     // What is drawn has the document's length, so offsets are the same in
-    // both: until the glyphs for a character arrive, a dot stands in for it.
-    const drawn = resolved.text.length === text.length && !resolved.pending ? resolved.text : text.replace(/[^\x20-\x7e\n]/g, "·");
+    // both. A character whose glyph is on its way is an empty advance of the
+    // face's size until it arrives; where no face can draw it, a dot stands in.
+    const drawn = resolved.text.length === text.length ? resolved.text : text.replace(/[^\x20-\x7e\n]/g, "·");
     this.pending = drawn !== text && resolved.text.length !== text.length ? true : resolved.pending;
     for (const cut of cuts) {
       if (cut.at < at) continue;

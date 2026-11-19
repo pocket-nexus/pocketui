@@ -215,3 +215,40 @@ export function layoutRich(spans: readonly Span[], maxWidth: number, measure: St
   if (lines.length < maxLines && (line.length > 0 || lines.length === 0 || (all.length > 0 && all[all.length - 1]!.kind === 3))) flush();
   return lines;
 }
+
+/** `lines` cut to `maxLines`, the last kept line ending in `ellipsis` set in
+ *  `style` when anything was dropped. The line gives up characters from its
+ *  end until the ellipsis fits `maxWidth`. */
+export function clampRich(lines: RichLine[], maxLines: number, maxWidth: number, measure: StyleMeasure, style: number, ellipsis = "..."): RichLine[] {
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  const last = kept[maxLines - 1];
+  if (!last) return kept;
+  const segments = last.segments.map((segment) => ({ ...segment }));
+  const mark = measure(ellipsis, style);
+  const room = maxWidth === Infinity ? Infinity : maxWidth - mark;
+  let width = segments.length > 0 ? segments[segments.length - 1]!.x + segments[segments.length - 1]!.width : 0;
+  while (segments.length > 0 && width > room) {
+    const tail = segments[segments.length - 1]!;
+    // a character less: a surrogate pair goes as one
+    let cut = tail.text.length - 1;
+    const c = tail.text.charCodeAt(cut);
+    if (cut > 0 && c >= 0xdc00 && c <= 0xdfff) cut--;
+    if (cut <= 0) segments.pop();
+    else {
+      tail.text = tail.text.slice(0, cut).replace(/[ \t]+$/, "");
+      tail.end = tail.start + tail.text.length;
+      tail.width = measure(tail.text, tail.style);
+      if (tail.text.length === 0) segments.pop();
+    }
+    const end = segments[segments.length - 1];
+    width = end ? end.x + end.width : 0;
+  }
+  const end = segments[segments.length - 1];
+  if (end && end.style === style) {
+    end.text += ellipsis;
+    end.width += mark;
+  } else segments.push({ text: ellipsis, style, x: width, width: mark, span: end ? end.span : 0, start: end ? end.end : 0, end: end ? end.end : 0 });
+  kept[maxLines - 1] = { segments, width: width + mark };
+  return kept;
+}
