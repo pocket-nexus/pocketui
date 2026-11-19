@@ -25,7 +25,7 @@ export type { MatrixProps } from "./ui/matrix.ts";
 export { Deck, Feed, Glyph, HStack, MatrixCode, RichText, Scroll, Spacer, Text, TextEditor, VStack, ZStack } from "./ui/primitives.ts";
 export type { EditorHandle, TextEditorProps } from "./ui/editor.ts";
 export type { Editor, EditorSnapshot, Token } from "./core/editor.ts";
-export { Badge, Bar, Bubble, Button, Callout, Card, confirm, Divider, Fact, Label, Legend, Panes, Placeholder, presentMenu, Progress, Row, Scaffold, Section, Segmented, StatusDot, Toast, Toggle, toneColor, Well, type BarProps, type ButtonProps, type MenuItem, type PanesViewProps, type RowProps, type ScaffoldProps, type Tone } from "./ui/kit.tsx";
+export { Badge, Bar, Bubble, Button, Callout, Card, confirm, Divider, Fact, Label, Legend, Panes, Picker, Placeholder, presentMenu, Progress, Row, Scaffold, Section, Segmented, StatusDot, Toast, Toggle, toneColor, Well, type BarProps, type ButtonProps, type MenuItem, type PanesViewProps, type PickerProps, type RowProps, type ScaffoldProps, type Tone } from "./ui/kit.tsx";
 export { Markdown, type MarkdownProps } from "./ui/markdown.ts";
 export { present, type Presentation, type PresentOptions } from "./ui/present.ts";
 export { forgetMeasures, measureIn, resolveFace, setFaceResolver, type FaceResolver } from "./ui/textview.ts";

@@ -92,13 +92,13 @@ const P: Record<string, readonly string[]> = {
 
 function glyphs(name: GlyphName, _size: number, state: PartState): GlyphArt | null {
   if (name === "grip") return NO_GLYPH;
-  const rows = P[name === "back" ? "left" : name === "forward" || name === "disclosure" ? "right" : name];
+  const rows = P[name === "back" ? "left" : name === "forward" || name === "disclosure" ? "right" : name === "updown" ? "down" : name];
   if (!rows) return null;
   // a disabled mark is the shadow colour; the others take the ink of where they sit
   return bitmap(rows, 1, state.disabled ? SHADOW : undefined);
 }
 
-const METRICS: Metrics = { target: 26, rowPad: 4, gutter: 6, bar: 24, radius: 0, caption: 20, menubar: 21, status: 21, control: 23, scrollbar: 16, captionButton: [16, 14], toggle: [13, 13], knob: [13, 13] };
+const METRICS: Metrics = { target: 26, rowPad: 4, gutter: 6, bar: 24, radius: 0, caption: 20, menubar: 21, status: 21, control: 23, scrollbar: 16, captionButton: [16, 14], buttonMin: 72, thumbInset: 0, toggle: [13, 13], knob: [13, 13] };
 
 export const CLASSIC_THEME = defineTheme({
   id: "classic",
@@ -114,6 +114,9 @@ export const CLASSIC_THEME = defineTheme({
     captionTrio: false,
     titleAlign: "leading",
     commands: "menubar",
+    unifiedBars: false,
+    actions: "footer",
+    picker: "popup",
     back: "glyph",
     scroll: "strip",
     scrollButtons: true,
@@ -151,6 +154,8 @@ export const CLASSIC_THEME = defineTheme({
     divider: { fill: SHADOW },
     button,
     field: (s) => ({ fill: s.disabled ? FACE : WHITE, bevel: SUNKEN, pad: [4, 5], opacity: 1, ink: s.disabled ? { faint: SHADOW } : undefined }),
+    picker: (s) => ({ fill: s.disabled ? FACE : WHITE, bevel: SUNKEN, pad: [2, 2, 2, 5], opacity: 1 }),
+    "picker.button": (s) => ({ fill: FACE, bevel: s.pressed ? DENT : RAISED, ink: { text: BLACK } }),
     toggle: { fill: WHITE, bevel: SUNKEN },
     "toggle.knob": {},
     segments: {},

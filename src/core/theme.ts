@@ -191,6 +191,8 @@ export const PARTS = [
   // controls
   "button",
   "field",
+  "picker",
+  "picker.button",
   "check",
   "radio",
   "toggle",
@@ -246,7 +248,7 @@ export const REST: PartState = { pressed: false, focused: false, disabled: false
 // Marks
 // ---------------------------------------------------------------------------
 
-export const GLYPHS = ["close", "back", "forward", "up", "down", "left", "right", "disclosure", "check", "dot", "more", "menu", "minimize", "zoom", "plus", "grip"] as const;
+export const GLYPHS = ["close", "back", "forward", "up", "down", "left", "right", "disclosure", "check", "dot", "more", "menu", "minimize", "zoom", "plus", "grip", "updown"] as const;
 export type GlyphName = (typeof GLYPHS)[number];
 
 /** One rectangle of a mark, in the mark's own points. `r` rounds it (half the
@@ -296,6 +298,10 @@ export interface Metrics {
   scrollbar: number;
   /** a title bar's control: width, height */
   captionButton: readonly [number, number];
+  /** the least width of a push button with a label: a row of them reads as a set */
+  buttonMin: number;
+  /** how far a scroll bar's thumb sits inside its strip, each side */
+  thumbInset: number;
   /** an on/off control: a switch's track or a check box, and the knob or the mark inside it */
   toggle: readonly [number, number];
   knob: readonly [number, number];
@@ -313,6 +319,12 @@ export interface Traits {
   titleAlign: "leading" | "center";
   /** where commands are offered when there is a pointer or a finger: controls in the pane's bar with the rest behind "more", or a menu bar across the frame with the bar's controls beside it */
   commands: "bar" | "menubar";
+  /** the title bar and the panes' bars read as one surface: every pane has a bar, all of one height, whether or not it has a title */
+  unifiedBars: boolean;
+  /** what a task or a dialog does, and the way out of it: a row of push buttons at its foot, or the way out named beside its heading and the thing to do as one wide button under the content */
+  actions: "footer" | "heading";
+  /** one choice of several: a row that opens the list of them, or its name beside a control that pops the list up */
+  picker: "row" | "popup";
   /** how going back is offered in a bar */
   back: "label" | "glyph";
   /** a scroll bar is a thumb over the content that shows while it moves, or a strip beside it */

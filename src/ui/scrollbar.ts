@@ -24,7 +24,7 @@ export interface ScrollBarProps extends BoxProps {
   never?: boolean;
 }
 
-const MIN_THUMB = 16;
+const MIN_THUMB = 24;
 
 class ScrollBarInstance extends Container {
   private thumb: Instance | undefined;
@@ -92,8 +92,11 @@ class ScrollBarInstance extends Container {
       thumb.place(0, button, side, 0);
       return;
     }
-    const length = Math.max(MIN_THUMB, Math.round((lane * extent) / (extent + max)));
-    thumb.place(0, Math.round(button + ((lane - length) * offset) / max), side, length);
+    // the theme's thumb may sit inside the strip: a capsule in a channel
+    const inset = this.root.theme.metric.thumbInset;
+    const run = lane - 2 * inset;
+    const length = Math.max(MIN_THUMB, Math.round((run * extent) / (extent + max)));
+    thumb.place(inset, Math.round(button + inset + ((run - length) * offset) / max), side - 2 * inset, length);
   }
 
   /** How far the content moves for a point of thumb travel. */

@@ -31,7 +31,7 @@ export const DARK: Palette = {
 
 const c = DARK;
 
-export const REGULAR_METRICS: Metrics = { target: 32, rowPad: 7, gutter: 10, bar: 30, radius: 6, caption: 26, menubar: 24, status: 20, control: 26, scrollbar: 0, captionButton: [22, 22], toggle: [30, 18], knob: [14, 14] };
+export const REGULAR_METRICS: Metrics = { target: 32, rowPad: 7, gutter: 10, bar: 30, radius: 6, caption: 26, menubar: 24, status: 20, control: 26, scrollbar: 0, captionButton: [22, 22], buttonMin: 0, thumbInset: 0, toggle: [30, 18], knob: [14, 14] };
 /** a 320 x 240 or 480 x 272 surface: rows closer, the gutter narrower */
 export const COMPACT_METRICS: Metrics = { ...REGULAR_METRICS, target: 26, rowPad: 5, gutter: 8, bar: 24, radius: 4, control: 22 };
 
@@ -60,6 +60,9 @@ export const POCKET_THEME = defineTheme({
     captionTrio: false,
     titleAlign: "leading",
     commands: "bar",
+    unifiedBars: false,
+    actions: "heading",
+    picker: "row",
     back: "label",
     scroll: "overlay",
     scrollButtons: false,
@@ -94,6 +97,8 @@ export const POCKET_THEME = defineTheme({
     divider: { fill: c.line },
     button,
     field: (s) => ({ fill: c.canvas, border: s.tone === "good" ? c.good : s.selected ? c.accent : c.line, radius: 6, pad: [5, 8] }),
+    picker: {},
+    "picker.button": {},
     toggle: (s) => ({ fill: s.selected ? c.accentFill : c.raised, border: s.selected ? c.accentFill : c.line, radius: 9, pad: 2 }),
     "toggle.knob": (s) => ({ fill: s.selected ? "#ffffff" : c.muted, radius: 7 }),
     segments: { fill: c.raised, radius: 6, pad: 2 },

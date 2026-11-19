@@ -5,7 +5,7 @@
 //
 // Original drawing in PocketJS primitives (three-stop gradients, rounded
 // boxes, 1-point strips); no artwork of any operating system.
-import { stroke } from "../core/glyphs.ts";
+import { stockGlyph, stroke } from "../core/glyphs.ts";
 import { defineTheme, FACES, type GlyphArt, type GlyphName, type Metrics, type Paint, type Palette, type PartState } from "../core/theme.ts";
 
 const FACE = "#ece9d8";
@@ -79,12 +79,13 @@ function glyphs(name: GlyphName, size: number, state: PartState): GlyphArt | nul
     if (name === "close") return { w: s, h: s, shapes: [stroke(s / 2, s / 2, s * 1.1, t, 45), stroke(s / 2, s / 2, s * 1.1, t, -45)] };
     return null;
   }
+  if (name === "updown") return stockGlyph("down", size);
   // a check box's mark is green
   if (name === "check" && state.variant === "toggle") return { w: size, h: size, shapes: [{ ...stroke(size * 0.28, size * 0.66, size * 0.42, 2, 45), color: "#21a121" }, { ...stroke(size * 0.63, size * 0.5, size * 0.8, 2, -51), color: "#21a121" }] };
   return null;
 }
 
-const METRICS: Metrics = { target: 26, rowPad: 4, gutter: 8, bar: 28, radius: 3, caption: 26, menubar: 21, status: 21, control: 23, scrollbar: 17, captionButton: [21, 21], toggle: [13, 13], knob: [13, 13] };
+const METRICS: Metrics = { target: 26, rowPad: 4, gutter: 8, bar: 28, radius: 3, caption: 26, menubar: 21, status: 21, control: 23, scrollbar: 17, captionButton: [21, 21], buttonMin: 72, thumbInset: 0, toggle: [13, 13], knob: [13, 13] };
 
 export const LUNA_THEME = defineTheme({
   id: "luna",
@@ -100,6 +101,9 @@ export const LUNA_THEME = defineTheme({
     captionTrio: false,
     titleAlign: "leading",
     commands: "menubar",
+    unifiedBars: false,
+    actions: "footer",
+    picker: "popup",
     back: "label",
     scroll: "strip",
     scrollButtons: true,
@@ -138,6 +142,8 @@ export const LUNA_THEME = defineTheme({
     divider: { fill: RULE },
     button,
     field: (s) => ({ fill: s.disabled ? "#f5f4ea" : WHITE, border: s.tone === "good" ? c.good : EDGE, pad: [4, 6], opacity: 1 }),
+    picker: (s) => ({ fill: s.disabled ? "#f5f4ea" : WHITE, border: EDGE, pad: [1, 1, 1, 6], opacity: 1 }),
+    "picker.button": (s) => ({ gradient: s.pressed ? ["#a9bef0", "#bdcff7"] : ["#cfdcfe", "#b6c9f6"], border: "#ffffff", radius: 2, ink: { text: "#4d6185" } }),
     toggle: { gradient: ["#dcdcd5", "#ffffff"], gradientDir: "right", border: "#1c5180" },
     "toggle.knob": {},
     segments: {},

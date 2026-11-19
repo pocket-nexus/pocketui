@@ -19,6 +19,16 @@ import { element, HSTACK, VSTACK, ZSTACK, type Instance, type Rect, type UIEleme
 import { provideUI, type UI } from "./mount.ts";
 import { TEXT } from "./textview.ts";
 
+/** Something a task or a dialog can do, or its way out. */
+export interface PresentAction {
+  label: string;
+  /** `primary` is the thing it is for; `destructive` is that, undone only by doing the opposite; `cancel` is the way out */
+  role?: "primary" | "destructive" | "cancel";
+  disabled?: boolean;
+  /** what it does; a `cancel` without one dismisses the panel. The panel stays up: an action that ends it dismisses it */
+  run?: () => void;
+}
+
 export interface PresentOptions {
   /** `sheet` is a task and `menu` a list of choices: each rises from the bottom edge at full width, or opens as a window in the middle, as the theme has it; `dialog` sits in the middle; `side` covers the trailing edge at full height; `popover` opens beside `anchor` */
   style?: "sheet" | "dialog" | "side" | "menu" | "popover";
@@ -26,6 +36,8 @@ export interface PresentOptions {
   title?: string;
   /** names the control that dismisses it beside a heading ("Cancel"); a title bar has its close box */
   closeLabel?: string;
+  /** What it does and its way out, read again when they change (a label, `disabled`). The caller draws no buttons: the theme arranges these as a row of push buttons at the panel's foot, in its order and at its end, or as the way out beside the heading and the thing to do as one wide button under the content. Their number and roles do not change while it is up. */
+  actions?: () => readonly PresentAction[];
   /** for `popover`: the rectangle it opens under, in the surface's coordinates */
   anchor?: Rect;
   /** the panel's width for `dialog`, `side` and `popover` (default 280; 200 for a popover) */
@@ -100,6 +112,61 @@ export function present(ui: UI, content: () => UINode, options: PresentOptions =
       return provideUI(ui, content);
     },
   });
+  // --- what it does: the actions, arranged by the theme -----------------------
+  const actions = options.actions;
+  const roles = actions ? actions().map((action) => action.role ?? "primary") : [];
+  const cancelAt = roles.indexOf("cancel");
+  const cancelAction = () => (actions && cancelAt >= 0 ? actions()[cancelAt] : undefined);
+  const closeLabel = options.closeLabel ?? cancelAction()?.label;
+  /** a row of push buttons at the foot: a dialog's always, a task's where the theme has it so */
+  const footer = () => asked === "dialog" || ui.theme.traits.actions === "footer";
+  const actionButton = (index: number, wide: boolean): UIElement =>
+    element(HSTACK, {
+      name: `panel.action.${index}`,
+      part: "button",
+      variant: roles[index] === "cancel" ? "tinted" : "filled",
+      tone: roles[index] === "destructive" ? "bad" : undefined,
+      justify: "center",
+      autoFocus: roles[index] !== "cancel",
+      grow: wide ? 1 : 0,
+      get minHeight() {
+        return ui.metric().control;
+      },
+      get minWidth() {
+        return wide ? undefined : ui.metric().buttonMin;
+      },
+      get disabled() {
+        return actions!()[index]?.disabled === true;
+      },
+      onPress: () => {
+        const action = actions!()[index];
+        if (action?.run) action.run();
+        else dismiss();
+      },
+      children: element(TEXT, { lines: 1, get value() { return actions!()[index]?.label ?? ""; } }) as UINode,
+    });
+  const foot = actions
+    ? element(HSTACK, {
+        name: "panel.actions",
+        padding: [8, 14, 12, 14],
+        spacing: 10,
+        get justify() {
+          return footer() ? (ui.theme.traits.dialogButtons === "center" ? ("center" as const) : ("end" as const)) : ("start" as const);
+        },
+        get children() {
+          const order = roles.map((_, index) => index);
+          if (footer()) {
+            // the way out and the thing to do, in the order the tradition has them
+            const last = ui.theme.traits.defaultLast;
+            order.sort((a, b) => (roles[a] === "cancel" ? 0 : 1) - (roles[b] === "cancel" ? 0 : 1));
+            if (!last) order.reverse();
+            return order.map((index) => actionButton(index, false)) as UINode;
+          }
+          // the way out is beside the heading: here, the thing to do, as wide as the panel
+          return order.filter((index) => roles[index] !== "cancel").map((index) => actionButton(index, true)) as UINode;
+        },
+      })
+    : null;
   const bar = titled
     ? caption(ui, { part: "dialog.caption", title: () => options.title!, close: options.dismissable === false ? undefined : () => dismiss })
     : null;
@@ -113,7 +180,7 @@ export function present(ui: UI, content: () => UINode, options: PresentOptions =
         children: [
           // a menu's heading is set as a section's is; a task's or a dialog's is its title
           element(TEXT, { grow: 1, lines: asked === "menu" ? 1 : 2, get value() { return ui.theme.traits.sectionCaps && asked === "menu" ? options.title!.toUpperCase() : options.title!; }, role: asked === "menu" ? undefined : ("title" as const), tone: asked === "menu" ? undefined : ("plain" as const) }),
-          options.closeLabel ? element(TEXT, { name: "panel.close", value: options.closeLabel, role: "strong", tone: "accent", lines: 1, padding: [2, 4], onPress: () => dismiss() }) : null,
+          closeLabel ? element(TEXT, { name: "panel.close", value: closeLabel, role: "strong", tone: "accent", lines: 1, padding: [2, 4], alignSelf: "center", get hidden() { return footer(); }, onPress: () => (cancelAction()?.run ?? dismiss)() }) : null,
         ].filter((entry) => entry !== null) as UINode,
       })
     : null;
@@ -135,7 +202,7 @@ export function present(ui: UI, content: () => UINode, options: PresentOptions =
     ref: (instance: Instance) => {
       panel = instance;
     },
-    children: [bar, heading, body].filter((entry) => entry !== null) as UINode,
+    children: [bar, heading, body, foot].filter((entry) => entry !== null) as UINode,
   });
   const layerElement: UIElement = element(ZSTACK, {
     name: "presentation",

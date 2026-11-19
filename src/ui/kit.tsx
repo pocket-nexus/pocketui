@@ -106,7 +106,24 @@ export function Button(props: ButtonProps): UIElement {
   const ui = useUI();
   const [own, box] = splitProps(props, ["label", "kind", "leading"]);
   return (
-    <HStack {...mergeProps({ get minHeight() { return ui.metric().control; }, justify: "center" as const, spacing: 6 }, box)} part="button" variant={own.kind ?? "tinted"}>
+    <HStack
+      {...mergeProps(
+        {
+          get minHeight() {
+            return ui.metric().control;
+          },
+          // push buttons in a row read as a set: none is narrower than the theme's least
+          get minWidth() {
+            return own.kind === "plain" || own.kind === "pill" ? undefined : ui.metric().buttonMin;
+          },
+          justify: "center" as const,
+          spacing: 6,
+        },
+        box,
+      )}
+      part="button"
+      variant={own.kind ?? "tinted"}
+    >
       {own.leading}
       <Text lines={1}>{own.label}</Text>
     </HStack>
@@ -163,6 +180,63 @@ export function Fact(props: { label: string; value: string | undefined; labelWid
 // ---------------------------------------------------------------------------
 // Controls with a state
 // ---------------------------------------------------------------------------
+
+export interface PickerProps {
+  /** what is being chosen: "Machine" */
+  label: string;
+  /** the present choice's name */
+  value?: string;
+  /** shown when there is no choice */
+  placeholder?: string;
+  /** a word about the present choice: "offline" */
+  note?: string;
+  /** the id of the present choice, marked in the list */
+  selected?: string;
+  options: () => readonly { id: string; title: string; detail?: string; trailing?: string; disabled?: boolean }[];
+  onPick: (id: string) => void;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  /** the width the label is set in where it sits beside the control (default 64) */
+  labelWidth?: number;
+  name?: string;
+}
+
+/** One choice of several. It is a row that opens the list in one tradition
+ *  and, in another, the label beside a control that pops the list up under
+ *  itself; the application says only what is chosen from what. */
+export function Picker(props: PickerProps): UIElement {
+  const ui = useUI();
+  let control: Instance | undefined;
+  const popup = () => ui.theme.traits.picker === "popup";
+  const open = () =>
+    presentMenu(ui, {
+      title: props.label,
+      anchor: popup() ? control : undefined,
+      width: popup() && control ? Math.max(160, control.w) : undefined,
+      items: () => props.options().map((option) => ({ ...option, checked: option.id === props.selected, run: () => props.onPick(option.id) })),
+    });
+  return (
+    <VStack>
+      <Show
+        when={popup()}
+        fallback={<Row title={props.value ?? props.placeholder ?? ""} eyebrow={props.label} trailing={props.note} disclosure disabled={props.disabled} autoFocus={props.autoFocus} onPress={open} name={props.name} />}
+      >
+        <HStack padding={[4, ui.metric().gutter + 4]} spacing={8}>
+          <Text width={props.labelWidth ?? 64} align="right" tone="muted" lines={1}>{`${props.label}:`}</Text>
+          <HStack part="picker" grow={1} minHeight={ui.metric().control} spacing={6} disabled={props.disabled} autoFocus={props.autoFocus} onPress={open} name={props.name} ref={(instance) => { control = instance; }}>
+            <Text grow={1} lines={1} tone={props.value ? "plain" : "faint"}>{props.value ?? props.placeholder ?? ""}</Text>
+            <Show when={props.note}>
+              <Text role="caption" tone="faint" lines={1}>{props.note}</Text>
+            </Show>
+            <ZStack part="picker.button" width={ui.metric().control - 2} height={ui.metric().control - 2} disabled={props.disabled}>
+              <Glyph glyph="updown" size={8} anchor="center" />
+            </ZStack>
+          </HStack>
+        </HStack>
+      </Show>
+    </VStack>
+  ) as UIElement;
+}
 
 /** A setting that is on or off: a check box in one tradition, a switch in another. */
 export function Toggle(props: { label: string; on: boolean; onChange: (on: boolean) => void; disabled?: boolean; name?: string }): UIElement {
@@ -232,8 +306,21 @@ export interface BarProps {
 }
 
 function BarControl(props: { label?: string; glyph?: GlyphName; tone?: Tone; disabled?: boolean; selected?: boolean; onPress: () => void; name: string }): UIElement {
+  const ui = useUI();
   return (
-    <HStack part="bar.button" tone={props.tone} disabled={props.disabled} selected={props.selected} onPress={props.onPress} name={props.name} spacing={4} justify="center">
+    <HStack
+      part="bar.button"
+      tone={props.tone}
+      disabled={props.disabled}
+      selected={props.selected}
+      onPress={props.onPress}
+      name={props.name}
+      spacing={4}
+      justify="center"
+      // every control of a bar is one height, a mark alone as tall as a word
+      minHeight={ui.metric().control}
+      minWidth={props.label ? undefined : ui.metric().control + 8}
+    >
       <Show when={props.glyph}>
         <Glyph glyph={props.glyph!} size={9} tone={props.tone} />
       </Show>
@@ -252,9 +339,14 @@ export function Bar(props: BarProps): UIElement {
   const overflow = createMemo(() => ui.idioms().commands.bar && ui.theme.traits.commands === "bar" && (props.commands ?? []).some((command) => !command.bar));
   const backShown = () => props.back !== false && ui.idioms().commands.bar && ui.idioms().panes === "stack" && center.canBack();
   const centred = () => ui.theme.traits.titleAlign === "center";
+  // Where the frame's bars are one surface, every pane has a bar and all are
+  // one height, with a second line or without, with a title or without: a
+  // pane with nothing open still carries its stretch of the surface.
+  const unified = () => ui.theme.traits.unifiedBars;
+  const empty = () => !props.title && !props.leading && !props.trailing && controls().length === 0 && !backShown();
   return (
-    <VStack>
-      <HStack part="bar" minHeight={ui.metric().bar + (props.subtitle ? 10 : 0)} spacing={6}>
+    <VStack hidden={empty() && !unified()}>
+      <HStack part="bar" height={unified() ? ui.metric().bar + 10 : undefined} minHeight={ui.metric().bar + (props.subtitle ? 10 : 0)} spacing={6}>
         <Show when={backShown()}>
           <BarControl label={ui.theme.traits.back === "label" ? "Back" : undefined} glyph="back" tone="accent" onPress={() => center.back()} name="bar.back" />
         </Show>
@@ -275,7 +367,7 @@ export function Bar(props: BarProps): UIElement {
           <BarControl glyph="more" tone="accent" onPress={() => center.openMenu?.()} name="bar.more" />
         </Show>
       </HStack>
-      <Divider />
+      <VStack height={1} part="divider" hidden={unified()} />
     </VStack>
   ) as UIElement;
 }
@@ -428,26 +520,25 @@ export function presentMenu(ui: UI, options: { title?: string; items: () => read
 
 /** Ask before something that is undone only by doing the opposite. The button names what it does. */
 export function confirm(ui: UI, options: { title: string; message?: string; action: string; destructive?: boolean; run: () => void }): Presentation {
+  // The title and the two buttons are the panel's (ui/present.ts): a title bar
+  // or a heading, and the buttons in the order and at the end the theme has them.
   const sheet: Presentation = present(
     ui,
-    () => {
-      const cancel = () => <Button label="Cancel" kind="tinted" onPress={() => sheet.dismiss()} name="confirm.cancel" />;
-      const act = () => <Button label={options.action} kind="filled" tone={options.destructive ? "bad" : undefined} autoFocus onPress={() => { sheet.dismiss(); options.run(); }} name="confirm.action" />;
-      return (
-        <VStack padding={[8, 14, 14, 14]} spacing={8}>
-          {/* the title is the panel's: a title bar where the theme's dialogs have one, a heading otherwise (ui/present.ts) */}
-          <Show when={options.message}>
-            <Text tone="muted">{options.message}</Text>
-          </Show>
-          <HStack spacing={8} justify={ui.theme.traits.dialogButtons === "center" ? "center" : "end"} padding={[6, 0, 0, 0]}>
-            <Show when={ui.theme.traits.defaultLast} fallback={[act(), cancel()]}>
-              {[cancel(), act()]}
-            </Show>
-          </HStack>
-        </VStack>
-      );
+    () => (
+      <VStack padding={[8, 14, 4, 14]}>
+        <Show when={options.message}>
+          <Text tone="muted">{options.message}</Text>
+        </Show>
+      </VStack>
+    ),
+    {
+      style: "dialog",
+      title: options.title,
+      actions: () => [
+        { label: "Cancel", role: "cancel" },
+        { label: options.action, role: options.destructive ? "destructive" : "primary", run: () => { sheet.dismiss(); options.run(); } },
+      ],
     },
-    { style: "dialog", title: options.title },
   );
   return sheet;
 }

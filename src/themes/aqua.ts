@@ -39,15 +39,46 @@ const c: Palette = {
 
 const ON_BLUE = { text: WHITE, muted: "#dce8f9", faint: "#c3d6f2", accent: WHITE, good: "#d6ffd0", warn: "#fff2b8", bad: "#ffd6d0", note: "#efdcff" };
 
-/** the light across the top half of a gel */
-const gloss = (radius: number, inset = 1): Layer => ({ t: inset, l: inset + 2, r: inset + 2, hFrac: 0.46, radius, gradient: ["#ffffffe0", "#ffffff28"] });
+/** A gel: a capsule of coloured glass lit from above. Its body shades from a
+ *  paler top through its deepest tone to a paler foot; over that, light
+ *  gathers along the foot (the glow) and a bright band lies across the top
+ *  half (the gloss). The two layers are inset from the rim, so the rim reads
+ *  as the glass's edge. `radius` is the capsule's: half its height. */
+interface Gel {
+  body: readonly [string, string, string];
+  rim: string;
+  glow: string;
+}
+const CLEAR: Gel = { body: ["#fbfbfb", "#dcdcdc", "#ececec"], rim: "#8c8c8c", glow: "#ffffffd8" };
+const CLEAR_DOWN: Gel = { body: ["#d9d9d9", "#b9b9b9", "#cdcdcd"], rim: "#6f6f6f", glow: "#ffffff90" };
+const BLUE_GLASS: Gel = { body: ["#9ccdf8", "#3b8ce6", "#58a8f0"], rim: "#2b58a4", glow: "#bfeeffd8" };
+const BLUE_DOWN: Gel = { body: ["#78b3ec", "#2670cc", "#408fe0"], rim: "#214a8e", glow: "#a8dcffb0" };
+const GRAPHITE: Gel = { body: ["#7c7c7c", "#585858", "#6a6a6a"], rim: "#3e3e3e", glow: "#ffffff48" };
 
-const WHITE_GEL: readonly [string, string, string] = ["#fdfdfd", "#e7e7e7", "#f4f4f4"];
-const BLUE_GEL: readonly [string, string, string] = ["#b9dcfb", "#4594ea", "#8fc9f8"];
-const BLUE_GEL_DOWN: readonly [string, string, string] = ["#9cc9f0", "#2f7dd6", "#74b3ea"];
+function gel(glass: Gel, radius: number): Paint {
+  return {
+    gradient: glass.body,
+    gradientMid: 0.52,
+    border: glass.rim,
+    radius,
+    under: [
+      { b: 1, l: 3, r: 3, hFrac: 0.44, radius: Math.max(1, radius - 3), gradient: ["#ffffff00", glass.glow] },
+      { t: 1, l: 3, r: 3, hFrac: 0.44, radius: Math.max(1, radius - 2), gradient: ["#fffffff0", "#ffffff30"] },
+    ],
+  };
+}
+/** the gloss alone, for a ground that is not a capsule (a bubble, a selected row) */
+const gloss = (radius: number): Layer => ({ t: 1, l: 3, r: 3, hFrac: 0.46, radius, gradient: ["#ffffffe0", "#ffffff28"] });
+
+const BLUE_GEL = BLUE_GLASS.body;
+
+// The title bar and the panes' bars are one sheet of brushed light grey: the
+// title bar's shade ends in the tone the bars' shade starts from, and no
+// line is drawn between them (traits.unifiedBars).
+const SHEET = ["#ececec", "#d6d6d6", "#bcbcbc"] as const;
 
 const captionPaint = (s: PartState): Paint => ({
-  gradient: s.active ? ["#ececec", "#d4d4d4"] : ["#f5f5f5", "#e6e6e6"],
+  gradient: s.active ? [SHEET[0], SHEET[1]] : ["#f5f5f5", "#e6e6e6"],
   under: [{ t: 0, h: 1, fill: "#fafafa" }],
   pad: [0, 8],
   text: "body",
@@ -60,22 +91,17 @@ const LIGHTS: Record<string, readonly [string, string, string]> = {
   zoom: ["#a5e58a", "#4dba3a", "#3b962d"],
 };
 
+/** A push button is a capsule the height of a control: 22 points, so its radius is 11. */
+const CAPSULE = 11;
+
 function button(s: PartState): Paint {
-  const radius = 11;
-  const ink = { text: s.tone === "bad" ? c.bad : "#000000" };
-  if (s.variant === "plain") return { fill: s.pressed ? "#00000018" : undefined, radius: 5, pad: [3, 10], text: "body", ink: { text: s.tone === "bad" ? c.bad : c.accent } };
-  const blue = s.variant === "filled" || s.pressed;
-  const paint: Paint = {
-    gradient: blue ? (s.pressed ? BLUE_GEL_DOWN : BLUE_GEL) : WHITE_GEL,
-    border: blue ? "#3d66b3" : "#9a9a9a",
-    radius,
-    pad: [3, 15],
-    text: "body",
-    ink,
-    under: [gloss(8)],
-  };
-  if (s.variant === "pill") return { ...paint, shadow: 1, pad: [3, 12] };
-  return paint;
+  if (s.variant === "plain") return { fill: s.pressed ? "#00000018" : undefined, radius: 5, pad: [0, 10], text: "body", ink: { text: s.disabled ? "#9c9c9c" : s.tone === "bad" ? c.bad : c.accent }, opacity: 1 };
+  // a button that cannot be pressed is clear glass with grey lettering, whatever it would be
+  if (s.disabled) return { ...gel({ ...CLEAR, rim: "#b4b4b4" }, CAPSULE), pad: [0, 16], text: "body", ink: { text: "#9c9c9c" }, opacity: 1 };
+  // the blue glass is for the thing to do; one that destroys is clear glass lettered in red, so it is never the button that beckons
+  const glass = s.pressed ? BLUE_DOWN : s.variant === "filled" && s.tone !== "bad" ? BLUE_GLASS : CLEAR;
+  const paint: Paint = { ...gel(glass, CAPSULE), pad: [0, 16], text: "body", ink: { text: s.tone === "bad" && !s.pressed ? c.bad : "#000000" } };
+  return s.variant === "pill" ? { ...paint, shadow: 1, pad: [0, 12] } : paint;
 }
 
 function badgeFill(tone: Tone | undefined): string {
@@ -96,7 +122,7 @@ function glyphs(name: GlyphName, _size: number, state: PartState): GlyphArt | nu
   return null;
 }
 
-const METRICS: Metrics = { target: 26, rowPad: 5, gutter: 10, bar: 30, radius: 5, caption: 22, menubar: 22, status: 20, control: 22, scrollbar: 15, captionButton: [12, 12], toggle: [14, 14], knob: [14, 14] };
+const METRICS: Metrics = { target: 26, rowPad: 5, gutter: 10, bar: 32, radius: 5, caption: 22, menubar: 22, status: 20, control: 22, scrollbar: 15, captionButton: [12, 12], buttonMin: 70, thumbInset: 2, toggle: [14, 14], knob: [14, 14] };
 
 export const AQUA_THEME = defineTheme({
   id: "aqua",
@@ -112,6 +138,9 @@ export const AQUA_THEME = defineTheme({
     captionTrio: true,
     titleAlign: "center",
     commands: "bar",
+    unifiedBars: true,
+    actions: "footer",
+    picker: "popup",
     back: "glyph",
     scroll: "strip",
     scrollButtons: false,
@@ -139,25 +168,25 @@ export const AQUA_THEME = defineTheme({
     "menubar.item": (s) => ({ gradient: s.selected || s.pressed ? ["#5f93e8", "#2d66d0"] : undefined, pad: [3, 8], ink: s.selected || s.pressed ? ON_BLUE : undefined }),
     status: { gradient: ["#e9e9e9", "#d6d6d6"], pad: [0, 10], under: [{ t: 0, h: 1, fill: "#a9a9a9" }, { t: 1, h: 1, fill: "#f6f6f6" }], ink: { text: "#3c3c3c" } },
     "status.cell": {},
-    // the toolbar carries on from where the title bar's shade ends
-    bar: { gradient: ["#d4d4d4", "#b9b9b9"], pad: [3, 8], under: [{ b: 0, h: 1, fill: "#7f7f7f" }], ink: { muted: "#3f3f3f" } },
+    bar: (s) => (s.variant === "footer" ? { fill: "#e4e4e4", under: [{ t: 0, h: 1, fill: "#bdbdbd" }] } : { gradient: [SHEET[1], SHEET[2]], pad: [0, 8], under: [{ b: 0, h: 1, fill: "#7f7f7f" }], ink: { muted: "#3f3f3f" } }),
     "bar.button": (s) => {
-      const ink = { accent: "#1c1c1c", bad: c.bad, text: "#1c1c1c" };
-      if (s.selected) return { gradient: ["#6a6a6a", "#8c8c8c"], border: "#4f4f4f", radius: 10, pad: [3, 10], ink: { accent: WHITE, bad: WHITE, text: WHITE } };
-      return { gradient: s.pressed ? ["#b9b9b9", "#d3d3d3"] : WHITE_GEL, border: "#878787", radius: 10, pad: [3, 10], ink, under: s.pressed ? undefined : [gloss(7)] };
+      if (s.disabled) return { ...gel({ ...CLEAR, rim: "#aeaeae" }, CAPSULE), pad: [0, 11], ink: { accent: "#9c9c9c", bad: "#9c9c9c", text: "#9c9c9c" }, opacity: 1 };
+      if (s.selected) return { ...gel(GRAPHITE, CAPSULE), pad: [0, 11], ink: { accent: WHITE, bad: WHITE, text: WHITE } };
+      return { ...gel(s.pressed ? CLEAR_DOWN : CLEAR, CAPSULE), pad: [0, 11], ink: { accent: "#1c1c1c", bad: c.bad, text: "#1c1c1c" } };
     },
     row: (s) => (s.selected ? { gradient: ["#5d94d6", "#2f6fc4"], pad: [5, 10], ink: ON_BLUE, under: [{ t: 0, h: 1, fill: "#76a4de" }] } : { fill: s.pressed ? "#e6eefb" : undefined, pad: [5, 10] }),
     section: { fill: "#f1f4f8", pad: [6, 10, 3, 10], text: "caption", ink: { text: "#62707f", faint: "#8a96a4" } },
-    divider: { fill: "#e0e0e0" },
+    // between rows a hair; between panes the edge of a column, which crosses the bars
+    divider: (s) => ({ fill: s.variant === "panes" ? "#9d9d9d" : "#e0e0e0" }),
     button,
     field: (s) => ({ fill: WHITE, border: s.tone === "good" ? c.good : s.selected ? "#5b96dd" : "#9d9d9d", radius: 3, pad: [4, 6], under: [{ t: 1, l: 1, r: 1, h: 1, fill: "#dcdcdc" }] }),
-    toggle: (s) => ({ gradient: s.selected ? [BLUE_GEL[0], BLUE_GEL[1]] : [WHITE_GEL[0], WHITE_GEL[1]], border: s.selected ? "#3d66b3" : "#8f8f8f", radius: 3 }),
+    picker: (s) => ({ ...gel(s.pressed ? CLEAR_DOWN : s.disabled ? { ...CLEAR, rim: "#b4b4b4" } : CLEAR, CAPSULE), pad: [0, 0, 0, 11], ink: s.disabled ? { text: "#9c9c9c" } : undefined, opacity: 1 }),
+    // the popup's cap: a bead of blue glass at its trailing end
+    "picker.button": (s) => ({ ...gel(s.disabled ? GRAPHITE : BLUE_GLASS, CAPSULE - 1), ink: { text: WHITE } }),
+    toggle: (s) => gel(s.selected ? BLUE_GLASS : CLEAR, 3),
     "toggle.knob": {},
     segments: {},
-    segment: (s) =>
-      s.selected
-        ? { gradient: ["#5b8fdc", "#3468c4"], border: "#2f5496", radius: 5, pad: [3, 12], ink: ON_BLUE }
-        : { gradient: s.pressed ? ["#c9c9c9", "#dedede"] : WHITE_GEL, border: "#9a9a9a", radius: 5, pad: [3, 12] },
+    segment: (s) => (s.selected ? { ...gel(BLUE_GLASS, 5), pad: [0, 12], ink: { text: "#000000" } } : { ...gel(s.pressed ? CLEAR_DOWN : CLEAR, 5), pad: [0, 12] }),
     progress: { fill: "#e6e6e6", border: "#8f8f8f", radius: 6, pad: 1 },
     "progress.fill": { gradient: BLUE_GEL, radius: 5 },
     card: (s) => ({ fill: s.pressed ? "#e4e4e4" : "#f1f1f1", border: s.tone === "warn" ? "#dba036" : "#cbcbcb", radius: 6, pad: [6, 9] }),
@@ -172,14 +201,14 @@ export const AQUA_THEME = defineTheme({
     scrim: { fill: c.scrim },
     menu: { fill: "#fffffff4", border: "#b0b0b0", radius: 5, shadow: 3, pad: [4, 0] },
     "menu.item": (s) => ({ gradient: s.focused || s.pressed || s.selected ? ["#5f93e8", "#2d66d0"] : undefined, pad: [5, 14, 5, 8], ink: s.focused || s.pressed || s.selected ? ON_BLUE : undefined, showsFocus: true }),
-    "menu.title": (s) => (s.variant === "menu" ? { pad: [7, 12, 4, 12], text: "caption", ink: { text: "#62707f" } } : { pad: [11, 14, 0, 14] }),
+    "menu.title": (s) => (s.variant === "menu" ? { pad: [7, 12, 4, 12], text: "caption", ink: { text: "#62707f" } } : { pad: [13, 18, 2, 18], text: "strong" }),
     separator: { fill: "#d4d4d4" },
-    dialog: { fill: WINDOW, border: "#9a9a9a", radius: 6, shadow: 3 },
+    dialog: { fill: WINDOW, border: "#8e8e8e", radius: 6, shadow: 3 },
     "dialog.caption": captionPaint,
     "dialog.body": {},
     sheet: { fill: WINDOW, border: "#9a9a9a", shadow: 3 },
-    "scroll.track": { gradient: ["#dfdfdf", "#f4f4f4", "#ffffff"], gradientDir: "right", gradientMid: 0.35, under: [{ l: 0, w: 1, fill: "#bdbdbd" }] },
-    "scroll.thumb": (s) => ({ gradient: s.pressed ? ["#7fb0ea", "#2f76d2", "#5f9de3"] : ["#a4cbf6", "#4a90e2", "#7fb6f1"], gradientDir: "right", border: "#3f6db6", radius: 7 }),
+    "scroll.track": { gradient: ["#d2d2d2", "#eeeeee", "#fbfbfb"], gradientDir: "right", gradientMid: 0.3, under: [{ l: 0, w: 1, fill: "#a9a9a9" }] },
+    "scroll.thumb": (s) => ({ gradient: s.pressed ? ["#7fb0ea", "#2f76d2", "#5f9de3"] : ["#a9cef7", "#4288e0", "#79b2f0"], gradientDir: "right", gradientMid: 0.55, border: "#3a66ad", radius: 6, under: [{ l: 2, t: 3, b: 3, w: 3, radius: 2, gradient: ["#ffffffc0", "#ffffff40"], gradientDir: "right" }] }),
     "scroll.button": {},
     focus: { border: "#6ea5e8", borderWidth: 3, pad: 2 },
     drag: { gradient: ["#5f93e8", "#2d66d0"], radius: 10, shadow: 2, pad: [3, 10], ink: ON_BLUE },

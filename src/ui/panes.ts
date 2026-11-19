@@ -48,7 +48,7 @@ class PanesInstance extends DeckInstance {
       void panesProps.inspectorWidth;
       this.invalidate();
     });
-    createRenderEffect(() => this.style({ bgColor: panesProps.rule ?? root.theme.paint("divider", REST).fill ?? root.theme.color.line }));
+    createRenderEffect(() => this.style({ bgColor: panesProps.rule ?? root.theme.paint("divider", { ...REST, variant: "panes" }).fill ?? root.theme.color.line }));
   }
 
   protected override mode(): NonNullable<DeckProps["transition"]> {

@@ -163,10 +163,15 @@ What that buys, from one source:
 | Scroll bar | a thumb over the content | a strip with an arrow at each end | the same, with ridges | a strip with a blue capsule |
 | A task or a menu | a sheet from the bottom edge | a window with a title bar | the same | a window with a heading |
 | Default button | filled, last | a black frame, first | a blue ring, first | a blue gel, last |
+| A task's actions (`present({ actions })`) | the way out beside the heading, the thing to do as one wide button | push buttons at the foot, centred | push buttons at the foot, trailing | push buttons at the foot, trailing, Cancel first |
+| One choice of several (`Picker`) | a row that opens the list | the label beside a combo box | the same | the label beside a popup with a blue cap |
+| The panes' bars | each its own, absent where a pane has no title | the same | the same | one surface with the title bar: every pane has one, all of one height |
 | Focus | a ring | a 1-point rectangle | an orange ring (inside a button) | a soft blue halo |
 | Edges | flat grounds | two bevel rings, raised or sunken | rounded, under a 1-point line | gradients under a gloss |
 
 The frame's parts only take a press for something they do. `Scaffold`'s close control runs the application's `onClose` (Pocket Lody closes the open session with it) and shows disabled while there is nothing to close; a theme that always shows three lights draws the other two disabled.
+
+The rule this rests on: **what a tradition arranges differently, the application does not draw.** It does not place a dialog's buttons, it says what the dialog does (`actions`); it does not build a row or a popup for a choice, it says what is chosen from what (`Picker`); it does not size a control, the theme's metrics do (every push control is `metric.control` tall and no push button is narrower than `metric.buttonMin`; a bar's controls are one height, a mark alone as tall as a word). When a theme looks wrong, the fix belongs in the theme or in the kit, and if it cannot be made there, the kit is missing a semantic.
 
 Nothing in an application or in the kit asks which theme is active. Two rules keep a change of theme from losing state: what holds state (a scroll view, a field, a pane) is made once and stays where it is in the tree, and only stateless chrome (a title bar, a row of dialog buttons) is made again for a theme that arranges it differently. That is why a `Scroll` is always a row of the view and a strip, and the strip takes no room under a theme whose scroll bar is an overlay.
 
@@ -221,7 +226,7 @@ mount(() => (
 
 Components inside read the surface with `useUI()`: `env()`, `idioms()`, `metric()`, `theme`, `setTheme`, `input`, `commands`, `transfer`, `resize`. `<PocketUI theme={…}>` names the theme to start in.
 
-The kit (`ui/kit.tsx`): `Scaffold` (the frame: title bar, menu bar, content, status and legend), `Panes`, `Bar`, `Row`, `Section`, `Divider`, `Placeholder`, `Button`, `Toggle`, `Segmented`, `Progress`, `Badge`, `StatusDot`, `Label`, `Fact`, the content grounds `Card`, `Well`, `Bubble`, `Callout`, `Toast`, and `presentMenu` / `confirm` over `present`.
+The kit (`ui/kit.tsx`): `Scaffold` (the frame: title bar, menu bar, content, status and legend), `Panes`, `Bar`, `Row`, `Section`, `Divider`, `Placeholder`, `Button`, `Picker`, `Toggle`, `Segmented`, `Progress`, `Badge`, `StatusDot`, `Label`, `Fact`, the content grounds `Card`, `Well`, `Bubble`, `Callout`, `Toast`, and `presentMenu` / `confirm` over `present`.
 
 ## Working on it
 
