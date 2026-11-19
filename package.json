@@ -8,7 +8,7 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "test": "bun test ./test",
-    "typecheck": "bun vendor/pocketjs/node_modules/typescript/bin/tsc -p tsconfig.json",
+    "typecheck": "bun vendor/pocketjs/node_modules/typescript/bin/tsc -p tsconfig.dev.json",
     "gallery": "bun tools/sim.ts gallery/pocket.app.json --do \"frames:40;shot:.cache/gallery.png\"",
     "fonts": "bun tools/pixel-font.ts"
   }

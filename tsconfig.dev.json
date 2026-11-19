@@ -1,3 +1,6 @@
+// The configuration `bun run typecheck` reads. It is not named tsconfig.json: PocketJS's compiler
+// inherits a project root's tsconfig.json when it checks an application, and this one names
+// packages (bun-types, the PocketJS checkout's) an application that vendors this repository may not have.
 {
   "compilerOptions": {
     "target": "ES2022",
